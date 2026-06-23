@@ -1,7 +1,8 @@
 import React from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { LayoutDashboard, Video, User, LogOut, Award } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 export const Sidebar: React.FC = () => {
   const { user, logout } = useApp();
@@ -10,16 +11,15 @@ export const Sidebar: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/');
+    navigate(ROUTES.LANDING);
   };
 
   const navItems = [
-    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-    { name: 'New Interview', path: '/interview/setup', icon: Video },
-    { name: 'Profile & Stats', path: '/profile', icon: User }
+    { name: 'Dashboard', path: ROUTES.DASHBOARD, icon: LayoutDashboard },
+    { name: 'New Interview', path: ROUTES.INTERVIEW_SETUP, icon: Video },
+    { name: 'Profile & Stats', path: ROUTES.PROFILE, icon: User }
   ];
 
-  // Quick helper to determine initials
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -50,7 +50,7 @@ export const Sidebar: React.FC = () => {
         <nav className="flex-1 space-y-1.5 mt-8">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+            const isActive = location.pathname === item.path || (item.path !== ROUTES.DASHBOARD && location.pathname.startsWith(item.path));
             return (
               <NavLink
                 key={item.name}
@@ -98,7 +98,7 @@ export const Sidebar: React.FC = () => {
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 flex h-16 border-t border-white/5 bg-app-bg/90 backdrop-blur-lg px-2 justify-around items-center">
         {navItems.map((item) => {
           const Icon = item.icon;
-          const isActive = location.pathname === item.path || (item.path !== '/dashboard' && location.pathname.startsWith(item.path));
+          const isActive = location.pathname === item.path || (item.path !== ROUTES.DASHBOARD && location.pathname.startsWith(item.path));
           return (
             <NavLink
               key={item.name}

@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { ROUTES } from '../constants/routes';
+import type { RoleId } from '../constants/roles';
+import type { DifficultyId } from '../constants/difficulty';
 import {
   Code2,
   Database,
@@ -16,16 +19,22 @@ export const InterviewSetupPage: React.FC = () => {
   const navigate = useNavigate();
 
   // Selection states
-  const [role, setRole] = useState<'Frontend' | 'Backend' | 'Product Manager' | 'Data Scientist'>('Frontend');
-  const [difficulty, setDifficulty] = useState<'Easy' | 'Medium' | 'Hard'>('Medium');
+  const [role, setRole] = useState<RoleId>('Frontend');
+  const [difficulty, setDifficulty] = useState<DifficultyId>('Medium');
   const [type, setType] = useState<'Technical' | 'Behavioral'>('Technical');
 
   const handleStart = () => {
     startSession(role, difficulty, type);
-    navigate('/interview/session');
+    navigate(ROUTES.INTERVIEW_SESSION);
   };
 
-  const roles = [
+  const roles: {
+    id: RoleId;
+    title: string;
+    desc: string;
+    icon: typeof Code2;
+    color: string;
+  }[] = [
     {
       id: 'Frontend',
       title: 'Frontend Engineer',
@@ -56,7 +65,11 @@ export const InterviewSetupPage: React.FC = () => {
     }
   ];
 
-  const difficulties = [
+  const difficulties: {
+    id: DifficultyId;
+    label: string;
+    desc: string;
+  }[] = [
     { id: 'Easy', label: 'Easy Track', desc: 'Core fundamentals and direct questions.' },
     { id: 'Medium', label: 'Medium Track', desc: 'Case studies, architectural trade-offs, and behavioral scenarios.' },
     { id: 'Hard', label: 'Hard Track', desc: 'Deep technical designs, algorithms, and complex systems.' }
@@ -91,7 +104,7 @@ export const InterviewSetupPage: React.FC = () => {
                 return (
                   <button
                     key={r.id}
-                    onClick={() => setRole(r.id as any)}
+                    onClick={() => setRole(r.id)}
                     className={`text-left p-5 rounded-2xl border transition-all cursor-pointer ${
                       isSelected
                         ? 'border-app-primary bg-app-primary/5 shadow-md shadow-app-primary/5'
@@ -131,7 +144,7 @@ export const InterviewSetupPage: React.FC = () => {
                 return (
                   <button
                     key={d.id}
-                    onClick={() => setDifficulty(d.id as any)}
+                    onClick={() => setDifficulty(d.id)}
                     className={`text-left p-4 rounded-xl border transition-all cursor-pointer ${
                       isSelected
                         ? 'border-app-primary bg-app-primary/5'

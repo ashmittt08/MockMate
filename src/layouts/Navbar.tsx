@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { Menu, X, Award, ChevronRight } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 export const Navbar: React.FC = () => {
   const { user } = useApp();
@@ -11,7 +12,7 @@ export const Navbar: React.FC = () => {
     <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-app-bg/80 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6 lg:px-8">
         {/* Brand Logo */}
-        <Link to="/" className="flex items-center space-x-2">
+        <Link to={ROUTES.LANDING} className="flex items-center space-x-2">
           <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-app-primary to-app-accent text-white shadow-lg shadow-app-primary/20">
             <Award className="h-5.5 w-5.5" />
           </div>
@@ -34,7 +35,7 @@ export const Navbar: React.FC = () => {
         <div className="hidden md:flex items-center space-x-4">
           {user ? (
             <Link
-              to="/dashboard"
+              to={ROUTES.DASHBOARD}
               className="inline-flex items-center space-x-1.5 rounded-lg bg-app-primary px-4 py-2.5 text-sm font-semibold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10"
             >
               <span>Go to Dashboard</span>
@@ -42,11 +43,11 @@ export const Navbar: React.FC = () => {
             </Link>
           ) : (
             <>
-              <Link to="/login" className="text-sm font-medium text-app-muted hover:text-app-text transition-colors">
+              <Link to={ROUTES.LOGIN} className="text-sm font-medium text-app-muted hover:text-app-text transition-colors">
                 Log In
               </Link>
               <Link
-                to="/signup"
+                to={ROUTES.SIGNUP}
                 className="rounded-lg bg-white/10 px-4 py-2.5 text-sm font-semibold text-app-text hover:bg-white/15 transition-all border border-white/5"
               >
                 Sign Up
@@ -84,7 +85,7 @@ export const Navbar: React.FC = () => {
           <div className="border-t border-white/5 pt-4 flex flex-col space-y-3">
             {user ? (
               <Link
-                to="/dashboard"
+                to={ROUTES.DASHBOARD}
                 onClick={() => setIsOpen(false)}
                 className="flex items-center justify-center space-x-1.5 rounded-lg bg-app-primary py-2.5 text-base font-semibold text-white hover:bg-app-primary/95 transition-all"
               >
@@ -94,14 +95,14 @@ export const Navbar: React.FC = () => {
             ) : (
               <>
                 <Link
-                  to="/login"
+                  to={ROUTES.LOGIN}
                   onClick={() => setIsOpen(false)}
                   className="block text-center py-2.5 text-base font-medium text-app-muted hover:text-app-text transition-colors"
                 >
                   Log In
                 </Link>
                 <Link
-                  to="/signup"
+                  to={ROUTES.SIGNUP}
                   onClick={() => setIsOpen(false)}
                   className="block text-center rounded-lg bg-white/10 py-2.5 text-base font-semibold text-app-text hover:bg-white/15 transition-all border border-white/5"
                 >

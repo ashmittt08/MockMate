@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Award, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 export const LoginPage: React.FC = () => {
   const { login } = useApp();
@@ -27,11 +28,11 @@ export const LoginPage: React.FC = () => {
     try {
       const success = await login(email);
       if (success) {
-        navigate('/dashboard');
+        navigate(ROUTES.DASHBOARD);
       } else {
         setError('Invalid credentials.');
       }
-    } catch (err) {
+    } catch {
       setError('Failed to login. Please try again.');
     } finally {
       setIsLoading(false);
@@ -53,7 +54,7 @@ export const LoginPage: React.FC = () => {
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center space-x-2">
+          <Link to={ROUTES.LANDING} className="inline-flex items-center space-x-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-app-primary to-app-accent text-white">
               <Award className="h-5.5 w-5.5" />
             </div>
@@ -177,7 +178,7 @@ export const LoginPage: React.FC = () => {
               onClick={() => {
                 setIsLoading(true);
                 setTimeout(() => {
-                  login('sso.github@mockmate.ai').then(() => navigate('/dashboard'));
+                  login('sso.github@mockmate.ai').then(() => navigate(ROUTES.DASHBOARD));
                 }, 1000);
               }}
               className="flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/50 py-2.5 text-xs font-semibold text-app-text hover:bg-white/5 transition-all"
@@ -191,7 +192,7 @@ export const LoginPage: React.FC = () => {
               onClick={() => {
                 setIsLoading(true);
                 setTimeout(() => {
-                  login('sso.google@mockmate.ai').then(() => navigate('/dashboard'));
+                  login('sso.google@mockmate.ai').then(() => navigate(ROUTES.DASHBOARD));
                 }, 1000);
               }}
               className="flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/50 py-2.5 text-xs font-semibold text-app-text hover:bg-white/5 transition-all"
@@ -222,7 +223,7 @@ export const LoginPage: React.FC = () => {
         {/* Link to Signup */}
         <p className="text-center text-sm text-app-muted">
           Don't have an account?{' '}
-          <Link to="/signup" className="font-semibold text-app-primary hover:underline">
+          <Link to={ROUTES.SIGNUP} className="font-semibold text-app-primary hover:underline">
             Create an account for free
           </Link>
         </p>

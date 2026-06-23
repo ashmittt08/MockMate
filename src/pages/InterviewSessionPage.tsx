@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { ROUTES } from '../constants/routes';
+import { LoadingState } from '../components/common/LoadingState';
 import {
   Clock,
   Mic,
@@ -12,20 +14,9 @@ import {
 } from 'lucide-react';
 
 export const InterviewSessionPage: React.FC = () => {
-  const { currentSession, submitAnswer, skipQuestion, completeSession, resetSession } = useApp();
+  const { currentSession, submitAnswer, skipQuestion, completeSession, resetSession, isLoading } = useApp();
   const navigate = useNavigate();
 
-  // If no active session, redirect to setup
-  useEffect(() => {
-    if (!currentSession) {
-      navigate('/interview/setup');
-    }
-  }, [currentSession, navigate]);
-
-  if (!currentSession) return null;
-
-  const currentQuestion = currentSession.questions[currentSession.activeQuestionIndex];
-  
   // Local states
   const [answer, setAnswer] = useState('');
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
@@ -37,12 +28,30 @@ export const InterviewSessionPage: React.FC = () => {
   const micIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dictationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Stopwatch timer logic
-  useEffect(() => {
+  const activeQuestionIndex = currentSession?.activeQuestionIndex;
+
+  // React state adjustment during render when the question index changes
+  const [prevIndex, setPrevIndex] = useState<number | undefined>(undefined);
+  if (activeQuestionIndex !== undefined && activeQuestionIndex !== prevIndex) {
+    setPrevIndex(activeQuestionIndex);
     setElapsedSeconds(0);
     setHintShown(false);
     setAnswer('');
     setIsRecording(false);
+  }
+
+  // If no active session, redirect to setup
+  useEffect(() => {
+    if (!currentSession && !isLoading) {
+      navigate(ROUTES.INTERVIEW_SETUP);
+    }
+  }, [currentSession, navigate, isLoading]);
+
+  // Stopwatch timer logic
+  useEffect(() => {
+    if (activeQuestionIndex === undefined) return;
+
+    // Clear dictation interval if active
     if (dictationIntervalRef.current) {
       clearInterval(dictationIntervalRef.current);
       dictationIntervalRef.current = null;
@@ -58,7 +67,7 @@ export const InterviewSessionPage: React.FC = () => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
     };
-  }, [currentSession.activeQuestionIndex]);
+  }, [activeQuestionIndex]);
 
   // Microphone waveform animation logic
   useEffect(() => {
@@ -72,6 +81,14 @@ export const InterviewSessionPage: React.FC = () => {
     };
   }, []);
 
+  if (isLoading) {
+    return <LoadingState message="Analyzing your responses with AI Evaluation Engine..." fullScreen />;
+  }
+
+  if (!currentSession) return null;
+
+  const currentQuestion = currentSession.questions[currentSession.activeQuestionIndex];
+
   // Format seconds into MM:SS
   const formatTime = (secs: number) => {
     const mins = Math.floor(secs / 60);
@@ -80,25 +97,32 @@ export const InterviewSessionPage: React.FC = () => {
   };
 
   const handleNext = () => {
+    if (!currentSession) return;
     submitAnswer(answer || 'No response typed.', elapsedSeconds, hintShown);
     
     // Check if it was the last question
     if (currentSession.activeQuestionIndex + 1 >= currentSession.questions.length) {
-      const reportId = completeSession();
-      navigate(`/feedback/${reportId}`);
+      completeSession().then((reportId) => {
+        navigate(`${ROUTES.FEEDBACK_BASE}/${reportId}`);
+      });
     }
   };
 
   const handleSkip = () => {
+    if (!currentSession) return;
     skipQuestion();
     if (currentSession.activeQuestionIndex + 1 >= currentSession.questions.length) {
-      const reportId = completeSession();
-      navigate(`/feedback/${reportId}`);
+      completeSession().then((reportId) => {
+        navigate(`${ROUTES.FEEDBACK_BASE}/${reportId}`);
+      });
     }
   };
 
   // Simulated Speech-to-Text typing loop
   const handleToggleDictation = () => {
+    if (!currentSession) return;
+    const currentQuestion = currentSession.questions[currentSession.activeQuestionIndex];
+
     if (isRecording) {
       if (dictationIntervalRef.current) {
         clearInterval(dictationIntervalRef.current);
@@ -136,7 +160,7 @@ export const InterviewSessionPage: React.FC = () => {
   const handleCancelSession = () => {
     if (window.confirm('Are you sure you want to end this interview? Your progress will not be saved.')) {
       resetSession();
-      navigate('/dashboard');
+      navigate(ROUTES.DASHBOARD);
     }
   };
 
@@ -228,7 +252,7 @@ export const InterviewSessionPage: React.FC = () => {
                   <span>Interviewer Guidance</span>
                 </h4>
                 <ul className="list-disc pl-4 space-y-1 text-[11px] text-app-muted leading-relaxed">
-                  {currentQuestion.tips.map((tip, idx) => (
+                  {currentQuestion.tips.map((tip: string, idx: number) => (
                     <li key={idx}>{tip}</li>
                   ))}
                 </ul>
@@ -328,7 +352,7 @@ export const InterviewSessionPage: React.FC = () => {
               
               {/* Wave bars list */}
               <div className="flex justify-between items-end h-8 bg-slate-950/40 rounded-lg p-2 border border-white/5">
-                {micBars.map((h, i) => (
+                {micBars.map((h: number, i: number) => (
                   <div
                     key={i}
                     style={{ height: `${h}%` }}

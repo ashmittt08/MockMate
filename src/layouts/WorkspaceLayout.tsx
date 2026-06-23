@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { useApp } from '../../context/AppContext';
+import { useApp } from '../context/AppContext';
 import { Sidebar } from './Sidebar';
 
 export const WorkspaceLayout: React.FC = () => {

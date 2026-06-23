@@ -3,12 +3,14 @@ import { AppProvider } from './context/AppContext';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
-import { WorkspaceLayout } from './components/layout/WorkspaceLayout';
+import { WorkspaceLayout } from './layouts/WorkspaceLayout';
+import { AuthLayout } from './layouts/AuthLayout';
 import { DashboardPage } from './pages/DashboardPage';
 import { InterviewSetupPage } from './pages/InterviewSetupPage';
 import { InterviewSessionPage } from './pages/InterviewSessionPage';
-import { FeedbackReportPage } from './pages/FeedbackReportPage';
+import { FeedbackPage } from './pages/FeedbackPage';
 import { ProfilePage } from './pages/ProfilePage';
+import { ROUTES } from './constants/routes';
 
 function App() {
   return (
@@ -16,21 +18,25 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/signup" element={<SignupPage />} />
+          <Route path={ROUTES.LANDING} element={<LandingPage />} />
+
+          {/* Guest Only Routes (Login/Signup guarded) */}
+          <Route element={<AuthLayout />}>
+            <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+            <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+          </Route>
 
           {/* Guarded Workspace Routes */}
           <Route element={<WorkspaceLayout />}>
-            <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/interview/setup" element={<InterviewSetupPage />} />
-            <Route path="/interview/session" element={<InterviewSessionPage />} />
-            <Route path="/feedback/:reportId" element={<FeedbackReportPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
+            <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+            <Route path={ROUTES.INTERVIEW_SETUP} element={<InterviewSetupPage />} />
+            <Route path={ROUTES.INTERVIEW_SESSION} element={<InterviewSessionPage />} />
+            <Route path={ROUTES.FEEDBACK} element={<FeedbackPage />} />
+            <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           </Route>
 
           {/* Catch-all Redirect */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
         </Routes>
       </BrowserRouter>
     </AppProvider>

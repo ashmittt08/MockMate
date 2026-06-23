@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Award, User as UserIcon, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 export const SignupPage: React.FC = () => {
   const { signup } = useApp();
@@ -32,11 +33,11 @@ export const SignupPage: React.FC = () => {
     try {
       const success = await signup(name, email);
       if (success) {
-        navigate('/dashboard');
+        navigate(ROUTES.DASHBOARD);
       } else {
         setError('Signup failed. Please try a different email.');
       }
-    } catch (err) {
+    } catch {
       setError('An error occurred. Please try again.');
     } finally {
       setIsLoading(false);
@@ -52,7 +53,7 @@ export const SignupPage: React.FC = () => {
       <div className="w-full max-w-md space-y-8">
         {/* Header */}
         <div className="text-center">
-          <Link to="/" className="inline-flex items-center space-x-2">
+          <Link to={ROUTES.LANDING} className="inline-flex items-center space-x-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-tr from-app-primary to-app-accent text-white">
               <Award className="h-5.5 w-5.5" />
             </div>
@@ -182,7 +183,7 @@ export const SignupPage: React.FC = () => {
               onClick={() => {
                 setIsLoading(true);
                 setTimeout(() => {
-                  signup('GitHub Developer', 'github.dev@mockmate.ai').then(() => navigate('/dashboard'));
+                  signup('GitHub Developer', 'github.dev@mockmate.ai').then(() => navigate(ROUTES.DASHBOARD));
                 }, 1000);
               }}
               className="flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/50 py-2.5 text-xs font-semibold text-app-text hover:bg-white/5 transition-all"
@@ -196,7 +197,7 @@ export const SignupPage: React.FC = () => {
               onClick={() => {
                 setIsLoading(true);
                 setTimeout(() => {
-                  signup('Google Partner', 'google.partner@mockmate.ai').then(() => navigate('/dashboard'));
+                  signup('Google Partner', 'google.partner@mockmate.ai').then(() => navigate(ROUTES.DASHBOARD));
                 }, 1000);
               }}
               className="flex items-center justify-center rounded-xl border border-white/10 bg-slate-900/50 py-2.5 text-xs font-semibold text-app-text hover:bg-white/5 transition-all"
@@ -227,7 +228,7 @@ export const SignupPage: React.FC = () => {
         {/* Link to Login */}
         <p className="text-center text-sm text-app-muted">
           Already have an account?{' '}
-          <Link to="/login" className="font-semibold text-app-primary hover:underline">
+          <Link to={ROUTES.LOGIN} className="font-semibold text-app-primary hover:underline">
             Sign in
           </Link>
         </p>

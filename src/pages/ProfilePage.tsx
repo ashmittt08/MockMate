@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { ROUTES } from '../constants/routes';
+import type { FeedbackReport } from '../types';
 import {
   Award,
   Calendar,
@@ -30,7 +32,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   // Maps achievement icons string references to Lucide React components
-  const iconMap: Record<string, any> = {
+  const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
     Award: Award,
     Calendar: Calendar,
     Zap: Zap,
@@ -153,10 +155,10 @@ export const ProfilePage: React.FC = () => {
 
             {interviews.length > 0 ? (
               <div className="space-y-4">
-                {interviews.map((rep) => (
+                {interviews.map((rep: FeedbackReport) => (
                   <div
                     key={rep.id}
-                    onClick={() => navigate(`/feedback/${rep.id}`)}
+                    onClick={() => navigate(`${ROUTES.FEEDBACK_BASE}/${rep.id}`)}
                     className="flex justify-between items-center p-4 rounded-xl border border-white/5 bg-slate-950/20 hover:bg-white/[0.01] hover:border-white/10 transition-all cursor-pointer group"
                   >
                     <div className="space-y-1">

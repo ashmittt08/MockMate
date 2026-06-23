@@ -11,8 +11,10 @@ import {
   RefreshCw,
   Sparkles
 } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
+import type { FeedbackSuggestion } from '../types';
 
-export const FeedbackReportPage: React.FC = () => {
+export const FeedbackPage: React.FC = () => {
   const { reportId } = useParams<{ reportId: string }>();
   const { getReportById } = useApp();
   const navigate = useNavigate();
@@ -26,7 +28,7 @@ export const FeedbackReportPage: React.FC = () => {
         <h2 className="text-2xl font-bold text-white">Report Not Found</h2>
         <p className="text-app-muted">The feedback report you are looking for does not exist or has expired.</p>
         <Link
-          to="/dashboard"
+          to={ROUTES.DASHBOARD}
           className="inline-flex items-center space-x-1.5 rounded-xl bg-app-primary px-4.5 py-2.5 text-xs font-semibold text-white"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -63,7 +65,7 @@ export const FeedbackReportPage: React.FC = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center space-x-3">
           <Link
-            to="/dashboard"
+            to={ROUTES.DASHBOARD}
             className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 border border-white/10 text-slate-300 hover:text-white transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -80,7 +82,7 @@ export const FeedbackReportPage: React.FC = () => {
 
         <div className="flex space-x-2">
           <button
-            onClick={() => navigate('/interview/setup')}
+            onClick={() => navigate(ROUTES.INTERVIEW_SETUP)}
             className="inline-flex items-center space-x-1.5 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/10 transition-colors"
           >
             <RefreshCw className="h-4 w-4" />
@@ -192,7 +194,7 @@ export const FeedbackReportPage: React.FC = () => {
             <span>Key Strengths Identified</span>
           </h3>
           <ul className="space-y-3">
-            {report.strengths.map((str, idx) => (
+            {report.strengths.map((str: string, idx: number) => (
               <li key={idx} className="flex items-start text-xs text-app-muted leading-relaxed">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mt-1.5 mr-2.5 shrink-0"></span>
                 <span>{str}</span>
@@ -208,7 +210,7 @@ export const FeedbackReportPage: React.FC = () => {
             <span>Areas for Improvement</span>
           </h3>
           <ul className="space-y-3">
-            {report.weaknesses.map((weak, idx) => (
+            {report.weaknesses.map((weak: string, idx: number) => (
               <li key={idx} className="flex items-start text-xs text-app-muted leading-relaxed">
                 <span className="h-1.5 w-1.5 rounded-full bg-orange-400 mt-1.5 mr-2.5 shrink-0"></span>
                 <span>{weak}</span>
@@ -225,7 +227,7 @@ export const FeedbackReportPage: React.FC = () => {
         </h3>
 
         <div className="space-y-3">
-          {report.suggestions.map((item, idx) => {
+          {report.suggestions.map((item: FeedbackSuggestion, idx: number) => {
             const isExpanded = expandedQuestion === idx;
             return (
               <div

@@ -1,4 +1,4 @@
-import type { Question, Achievement } from '../types';
+import type { Question } from '../types';
 
 export const mockQuestions: Question[] = [
   // --- FRONTEND QUESTIONS ---
@@ -178,57 +178,4 @@ export const mockQuestions: Question[] = [
   }
 ];
 
-export const getQuestionsForSession = (
-  role: 'Frontend' | 'Backend' | 'Product Manager' | 'Data Scientist',
-  difficulty: 'Easy' | 'Medium' | 'Hard',
-  type: 'Technical' | 'Behavioral'
-): Question[] => {
-  // Filter questions matching criteria
-  let filtered = mockQuestions.filter(
-    (q) => q.role === role && q.difficulty === difficulty && q.type === type
-  );
 
-  // If no exact match, relax difficulty constraint first
-  if (filtered.length === 0) {
-    filtered = mockQuestions.filter((q) => q.role === role && q.type === type);
-  }
-
-  // If still empty, relax role constraint (use default questions)
-  if (filtered.length === 0) {
-    filtered = mockQuestions.filter((q) => q.type === type);
-  }
-
-  // Take up to 3 questions, randomize order or return slice
-  return filtered.slice(0, 3);
-};
-
-export const defaultAchievements: Achievement[] = [
-  {
-    id: 'first_step',
-    title: 'First Step',
-    description: 'Complete your first practice interview session.',
-    iconName: 'Award',
-    isUnlocked: false
-  },
-  {
-    id: 'consistency_king',
-    title: 'Consistency King',
-    description: 'Complete 3 or more interviews in total.',
-    iconName: 'Calendar',
-    isUnlocked: false
-  },
-  {
-    id: 'top_performer',
-    title: 'Top Performer',
-    description: 'Earn an overall evaluation score of 85% or higher.',
-    iconName: 'Zap',
-    isUnlocked: false
-  },
-  {
-    id: 'time_master',
-    title: 'Time Master',
-    description: 'Answer a technical question in under 2 minutes.',
-    iconName: 'Clock',
-    isUnlocked: false
-  }
-];

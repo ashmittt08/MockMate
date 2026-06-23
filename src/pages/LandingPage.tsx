@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { Navbar } from '../components/layout/Navbar';
+import { Navbar } from '../layouts/Navbar';
 import { useApp } from '../context/AppContext';
 import {
   Video,
@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   Users
 } from 'lucide-react';
+import { ROUTES } from '../constants/routes';
 
 export const LandingPage: React.FC = () => {
   const { user } = useApp();
@@ -104,7 +105,7 @@ export const LandingPage: React.FC = () => {
             {/* CTAs */}
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
               <Link
-                to={user ? "/dashboard" : "/signup"}
+                to={user ? ROUTES.DASHBOARD : ROUTES.SIGNUP}
                 className="w-full sm:w-auto inline-flex items-center justify-center rounded-xl bg-app-primary px-6 py-3.5 text-base font-semibold text-white hover:bg-app-primary/95 transition-all shadow-lg shadow-app-primary/15"
               >
                 <span>Practice For Free</span>
@@ -293,7 +294,7 @@ export const LandingPage: React.FC = () => {
             </p>
             <div className="mt-8">
               <Link
-                to={user ? "/dashboard" : "/signup"}
+                to={user ? ROUTES.DASHBOARD : ROUTES.SIGNUP}
                 className="inline-flex items-center space-x-1.5 rounded-xl bg-white text-slate-900 px-6 py-3.5 font-bold hover:bg-slate-100 transition-colors shadow-lg"
               >
                 <span>Get Started Now</span>
@@ -325,10 +326,10 @@ export const LandingPage: React.FC = () => {
           <div>
             <h4 className="font-bold text-slate-300 mb-3 uppercase tracking-wider text-[10px]">Careers Prep</h4>
             <ul className="space-y-2">
-              <li><Link to="/signup" className="hover:text-app-text transition-colors">Frontend Modules</Link></li>
-              <li><Link to="/signup" className="hover:text-app-text transition-colors">Backend Modules</Link></li>
-              <li><Link to="/signup" className="hover:text-app-text transition-colors">Product Management</Link></li>
-              <li><Link to="/signup" className="hover:text-app-text transition-colors">Data Science Tracks</Link></li>
+              <li><Link to={ROUTES.SIGNUP} className="hover:text-app-text transition-colors">Frontend Modules</Link></li>
+              <li><Link to={ROUTES.SIGNUP} className="hover:text-app-text transition-colors">Backend Modules</Link></li>
+              <li><Link to={ROUTES.SIGNUP} className="hover:text-app-text transition-colors">Product Management</Link></li>
+              <li><Link to={ROUTES.SIGNUP} className="hover:text-app-text transition-colors">Data Science Tracks</Link></li>
             </ul>
           </div>
 
@@ -337,8 +338,8 @@ export const LandingPage: React.FC = () => {
             <ul className="space-y-2">
               <li><a href="#features" className="hover:text-app-text transition-colors">Features list</a></li>
               <li><a href="#how-it-works" className="hover:text-app-text transition-colors">How it works</a></li>
-              <li><Link to="/login" className="hover:text-app-text transition-colors">Sign in</Link></li>
-              <li><Link to="/signup" className="hover:text-app-text transition-colors">Sign up sandbox</Link></li>
+              <li><Link to={ROUTES.LOGIN} className="hover:text-app-text transition-colors">Sign in</Link></li>
+              <li><Link to={ROUTES.SIGNUP} className="hover:text-app-text transition-colors">Sign up sandbox</Link></li>
             </ul>
           </div>
 

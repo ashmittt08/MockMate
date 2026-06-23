@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { ROUTES } from '../constants/routes';
 import {
   Award,
   Video,
@@ -66,7 +67,7 @@ export const DashboardPage: React.FC = () => {
           </p>
         </div>
         <Link
-          to="/interview/setup"
+          to={ROUTES.INTERVIEW_SETUP}
           className="inline-flex items-center justify-center space-x-1.5 rounded-xl bg-app-primary px-4.5 py-3 text-sm font-semibold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10 self-start sm:self-auto"
         >
           <Video className="h-4 w-4" />
@@ -212,14 +213,14 @@ export const DashboardPage: React.FC = () => {
 
           <div className="space-y-2 mt-6">
             <Link
-              to="/interview/setup"
+              to={ROUTES.INTERVIEW_SETUP}
               className="flex w-full items-center justify-between rounded-xl bg-gradient-to-r from-app-primary to-app-accent px-4 py-3.5 text-xs font-semibold text-white hover:brightness-110 transition-all shadow-md shadow-app-primary/10"
             >
               <span>Setup Interview Track</span>
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
-              to="/profile"
+              to={ROUTES.PROFILE}
               className="flex w-full items-center justify-center rounded-xl border border-white/10 bg-white/5 py-3 text-xs font-semibold text-app-text hover:bg-white/10 transition-colors"
             >
               View Achievement Badges
@@ -282,7 +283,7 @@ export const DashboardPage: React.FC = () => {
                     </td>
                     <td className="py-4 pl-4 text-right">
                       <button
-                        onClick={() => navigate(`/feedback/${report.id}`)}
+                        onClick={() => navigate(`${ROUTES.FEEDBACK_BASE}/${report.id}`)}
                         className="inline-flex items-center space-x-1 rounded-lg bg-white/5 hover:bg-white/10 px-3 py-1.5 text-xs font-semibold text-slate-200 hover:text-white transition-all border border-white/5 group-hover:border-white/10"
                       >
                         <span>Report</span>
@@ -297,7 +298,7 @@ export const DashboardPage: React.FC = () => {
             <div className="text-center py-12">
               <p className="text-sm text-app-muted mb-4">You have not completed any practice sessions yet.</p>
               <Link
-                to="/interview/setup"
+                to={ROUTES.INTERVIEW_SETUP}
                 className="inline-flex items-center space-x-1 text-xs text-app-primary hover:underline font-semibold"
               >
                 <span>Launch your first simulation</span>
