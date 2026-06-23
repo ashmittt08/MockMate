@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ROUTES } from '../constants/routes';
@@ -8,28 +8,19 @@ import {
   Calendar,
   Zap,
   Clock,
-  Save,
-  CheckCircle2,
   ChevronRight,
-  Sliders
+  Sliders,
+  Lock
 } from 'lucide-react';
 
 export const ProfilePage: React.FC = () => {
-  const { user, interviews, achievements, updateProfile } = useApp();
+  const { user, interviews, achievements } = useApp();
   const navigate = useNavigate();
 
-  // Local state for profile form editing
-  const [name, setName] = useState(user?.name || '');
-  const [targetRole, setTargetRole] = useState(user?.targetRole || '');
-  const [bio, setBio] = useState(user?.bio || '');
-  const [showSavedMsg, setShowSavedMsg] = useState(false);
-
-  const handleSave = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateProfile(name, targetRole, bio);
-    setShowSavedMsg(true);
-    setTimeout(() => setShowSavedMsg(false), 2000);
-  };
+  // Profile settings are read-only
+  const name = user?.displayName || 'User';
+  const targetRole = 'Candidate';
+  const bio = 'AI practice partner.';
 
   // Maps achievement icons string references to Lucide React components
   const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -40,6 +31,7 @@ export const ProfilePage: React.FC = () => {
   };
 
   const getInitials = (n: string) => {
+    if (!n) return 'MM';
     return n
       .split(' ')
       .map((w) => w[0])
@@ -72,13 +64,12 @@ export const ProfilePage: React.FC = () => {
               <span>Career Settings</span>
             </h3>
 
-            <form onSubmit={handleSave} className="space-y-5">
-              {showSavedMsg && (
-                <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-400 text-center flex items-center justify-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4" />
-                  <span>Profile updated successfully!</span>
-                </div>
-              )}
+            <div className="space-y-5">
+              {/* Info Msg */}
+              <div className="rounded-lg bg-indigo-500/10 border border-indigo-500/20 p-3.5 text-xs text-indigo-400 text-center flex items-center justify-center space-x-2">
+                <Lock className="h-4 w-4" />
+                <span>Profile settings are read-only for Google Accounts.</span>
+              </div>
 
               {/* Grid: Name & Target Role */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -88,10 +79,9 @@ export const ProfilePage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    required
+                    disabled
                     value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="block w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-xs text-white focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all"
+                    className="block w-full rounded-xl border border-white/5 bg-slate-950/20 px-4 py-3 text-xs text-slate-500 cursor-not-allowed outline-none"
                   />
                 </div>
 
@@ -101,10 +91,9 @@ export const ProfilePage: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    required
+                    disabled
                     value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value)}
-                    className="block w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-xs text-white focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all"
+                    className="block w-full rounded-xl border border-white/5 bg-slate-950/20 px-4 py-3 text-xs text-slate-500 cursor-not-allowed outline-none"
                   />
                 </div>
               </div>
@@ -112,12 +101,12 @@ export const ProfilePage: React.FC = () => {
               {/* Email Address Read Only */}
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-2">
-                  Email Address (Verified Sandbox)
+                  Email Address
                 </label>
                 <input
                   type="email"
                   disabled
-                  value={user?.email}
+                  value={user?.email || ''}
                   className="block w-full rounded-xl border border-white/5 bg-slate-950/20 px-4 py-3 text-xs text-slate-500 cursor-not-allowed outline-none"
                 />
               </div>
@@ -128,22 +117,23 @@ export const ProfilePage: React.FC = () => {
                   Short Bio
                 </label>
                 <textarea
+                  disabled
                   value={bio}
-                  onChange={(e) => setBio(e.target.value)}
                   rows={4}
-                  className="block w-full rounded-xl border border-white/10 bg-slate-950/40 px-4 py-3 text-xs text-white focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all resize-none leading-relaxed"
+                  className="block w-full rounded-xl border border-white/5 bg-slate-950/20 px-4 py-3 text-xs text-slate-500 cursor-not-allowed outline-none resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Save Trigger */}
+              {/* Save Trigger - Disabled */}
               <button
-                type="submit"
-                className="inline-flex items-center space-x-1.5 rounded-xl bg-app-primary px-5 py-3 text-xs font-bold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10 cursor-pointer"
+                type="button"
+                disabled
+                className="inline-flex items-center space-x-1.5 rounded-xl bg-app-primary/20 px-5 py-3 text-xs font-bold text-slate-500 cursor-not-allowed border border-white/5"
               >
-                <Save className="h-4 w-4" />
+                <Lock className="h-4 w-4" />
                 <span>Save Profile Changes</span>
               </button>
-            </form>
+            </div>
           </div>
 
           {/* Interview history list */}
@@ -198,13 +188,21 @@ export const ProfilePage: React.FC = () => {
           
           {/* Avatar Profile Card */}
           <div className="rounded-2xl border border-white/5 bg-app-surface/20 p-6 text-center space-y-4">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-tr from-app-primary to-app-accent text-2xl font-black text-white uppercase shadow-lg shadow-app-primary/10">
-              {user ? getInitials(user.name) : 'MM'}
-            </div>
+            {user?.photoURL ? (
+              <img
+                src={user.photoURL}
+                alt={user.displayName || 'Avatar'}
+                className="mx-auto h-20 w-20 rounded-2xl object-cover shadow-lg shadow-app-primary/10"
+              />
+            ) : (
+              <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-tr from-app-primary to-app-accent text-2xl font-black text-white uppercase shadow-lg shadow-app-primary/10">
+                {user ? getInitials(user.displayName || '') : 'MM'}
+              </div>
+            )}
             <div>
-              <h3 className="font-bold text-white">{user?.name}</h3>
+              <h3 className="font-bold text-white">{name}</h3>
               <p className="text-[10px] text-app-muted uppercase tracking-wider font-semibold mt-1">
-                Target: {user?.targetRole}
+                Target: {targetRole}
               </p>
             </div>
             <div className="border-t border-white/5 pt-4 grid grid-cols-2 text-center text-xs">

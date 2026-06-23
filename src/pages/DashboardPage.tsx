@@ -63,7 +63,7 @@ export const DashboardPage: React.FC = () => {
             Dashboard
           </h1>
           <p className="text-sm text-app-muted mt-1">
-            Welcome back, <strong className="text-white font-medium">{user?.name}</strong>. Ready to practice?
+            Welcome back, <strong className="text-white font-medium">{user?.displayName || 'User'}</strong>. Ready to practice?
           </p>
         </div>
         <Link

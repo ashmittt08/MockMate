@@ -2,10 +2,19 @@ import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { Sidebar } from './Sidebar';
+import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const WorkspaceLayout: React.FC = () => {
-  const { user, currentSession } = useApp();
+  const { user, loading, currentSession } = useApp();
   const location = useLocation();
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-app-bg text-app-text">
+        <LoadingSpinner size="lg" />
+      </div>
+    );
+  }
 
   // Route guarding: if not logged in, redirect to login
   if (!user) {

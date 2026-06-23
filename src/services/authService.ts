@@ -1,28 +1,18 @@
-import type { User } from '../types';
-import { createDummyUser, createNewUser } from '../data/mockUsers';
+import { signInWithPopup, signOut } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
+import { auth, googleProvider } from '../lib/firebase';
 
 export const authService = {
-  login: async (email: string, interviewsCompleted: number): Promise<User> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(createDummyUser(email, interviewsCompleted));
-      }, 800);
-    });
-  },
-
-  signup: async (name: string, email: string): Promise<User> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve(createNewUser(name, email));
-      }, 800);
-    });
+  loginWithGoogle: async (): Promise<FirebaseUser> => {
+    const result = await signInWithPopup(auth, googleProvider);
+    return result.user;
   },
 
   logout: async (): Promise<void> => {
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        resolve();
-      }, 100);
-    });
+    await signOut(auth);
+  },
+
+  getCurrentUser: (): FirebaseUser | null => {
+    return auth.currentUser;
   }
 };

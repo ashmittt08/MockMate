@@ -11,7 +11,7 @@ export const Sidebar: React.FC = () => {
 
   const handleLogout = () => {
     logout();
-    navigate(ROUTES.LANDING);
+    navigate(ROUTES.LOGIN);
   };
 
   const navItems = [
@@ -21,6 +21,7 @@ export const Sidebar: React.FC = () => {
   ];
 
   const getInitials = (name: string) => {
+    if (!name) return 'MM';
     return name
       .split(' ')
       .map((n) => n[0])
@@ -74,12 +75,20 @@ export const Sidebar: React.FC = () => {
         <div className="mt-auto space-y-4 pt-6 border-t border-white/5">
           {user && (
             <div className="flex items-center space-x-3 px-2 py-1">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-app-accent to-app-primary text-sm font-semibold text-white uppercase">
-                {getInitials(user.name)}
-              </div>
+              {user.photoURL ? (
+                <img
+                  src={user.photoURL}
+                  alt={user.displayName || 'User'}
+                  className="h-10 w-10 shrink-0 rounded-xl object-cover"
+                />
+              ) : (
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-tr from-app-accent to-app-primary text-sm font-semibold text-white uppercase">
+                  {getInitials(user.displayName || '')}
+                </div>
+              )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-semibold text-app-text">{user.name}</p>
-                <p className="truncate text-[11px] text-app-muted">{user.targetRole}</p>
+                <p className="truncate text-sm font-semibold text-app-text">{user.displayName || 'User'}</p>
+                <p className="truncate text-[11px] text-app-muted">Candidate</p>
               </div>
             </div>
           )}

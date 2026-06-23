@@ -1,18 +1,24 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { User, InterviewSession, FeedbackReport, Achievement } from '../types';
+import type { InterviewSession, FeedbackReport, Achievement } from '../types';
 import { initialHistoricalInterviews, defaultAchievements } from '../data/mockInterviews';
 import { authService } from '../services/authService';
 import { interviewService } from '../services/interviewService';
 import { feedbackService } from '../services/feedbackService';
+import { onAuthStateChanged } from 'firebase/auth';
+import type { User as FirebaseUser } from 'firebase/auth';
+import { auth } from '../lib/firebase';
 
 interface AppContextType {
-  user: User | null;
+  user: FirebaseUser | null;
   interviews: FeedbackReport[];
   currentSession: InterviewSession | null;
   achievements: Achievement[];
   isLoading: boolean;
+  loading: boolean;
+  isAuthenticated: boolean;
   login: (email: string) => Promise<boolean>;
   signup: (name: string, email: string) => Promise<boolean>;
+  loginWithGoogle: () => Promise<boolean>;
   logout: () => Promise<void>;
   updateProfile: (name: string, targetRole: string, bio: string) => void;
   startSession: (
@@ -30,10 +36,10 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(() => {
-    const stored = localStorage.getItem('mockmate_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const isAuthenticated = !!user;
 
   const [interviews, setInterviews] = useState<FeedbackReport[]>(() => {
     const stored = localStorage.getItem('mockmate_interviews');
@@ -66,12 +72,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    if (user) {
-      localStorage.setItem('mockmate_user', JSON.stringify(user));
-    } else {
-      localStorage.removeItem('mockmate_user');
-    }
-  }, [user]);
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      setUser(firebaseUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('mockmate_interviews', JSON.stringify(interviews));
@@ -89,28 +95,24 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     localStorage.setItem('mockmate_achievements', JSON.stringify(achievements));
   }, [achievements]);
 
-  const login = async (email: string): Promise<boolean> => {
-    setIsLoading(true);
-    try {
-      const loggedUser = await authService.login(email, interviews.length);
-      setUser(loggedUser);
-      return true;
-    } catch {
-      return false;
-    } finally {
-      setIsLoading(false);
-    }
+  const login = async (_email: string): Promise<boolean> => {
+    // Disabled in favor of loginWithGoogle
+    return false;
   };
 
-  const signup = async (name: string, email: string): Promise<boolean> => {
+  const signup = async (_name: string, _email: string): Promise<boolean> => {
+    // Disabled in favor of loginWithGoogle
+    return false;
+  };
+
+  const loginWithGoogle = async (): Promise<boolean> => {
     setIsLoading(true);
     try {
-      const newUser = await authService.signup(name, email);
-      setUser(newUser);
-      setInterviews([]);
-      setAchievements(defaultAchievements);
+      const loggedUser = await authService.loginWithGoogle();
+      setUser(loggedUser);
       return true;
-    } catch {
+    } catch (error) {
+      console.error('Google login failed:', error);
       return false;
     } finally {
       setIsLoading(false);
@@ -125,19 +127,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setCurrentSession(null);
       setInterviews(initialHistoricalInterviews);
       setAchievements(defaultAchievements);
-      localStorage.removeItem('mockmate_user');
       localStorage.removeItem('mockmate_interviews');
       localStorage.removeItem('mockmate_current_session');
       localStorage.removeItem('mockmate_achievements');
+    } catch (error) {
+      console.error('Logout failed:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const updateProfile = (name: string, targetRole: string, bio: string) => {
-    if (user) {
-      setUser({ ...user, name, targetRole, bio });
-    }
+  const updateProfile = (_name: string, _targetRole: string, _bio: string) => {
+    // no-op, as profile editing is disabled per user request
   };
 
   const startSession = async (
@@ -182,13 +183,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       const updatedInterviews = [report, ...interviews];
       setInterviews(updatedInterviews);
 
-      if (user) {
-        setUser({
-          ...user,
-          interviewsCompleted: user.interviewsCompleted + 1
-        });
-      }
-
       // Evaluate Achievements
       setAchievements((prev) => {
         return prev.map((a) => {
@@ -200,7 +194,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           if (a.id === 'top_performer' && report.overallScore >= 85) unlock = true;
           
           const fastAnswer = currentSession.answers.some(
-            (ans) => ans.timeSpentSeconds < 120 && !ans.userAnswer.includes('skipped')
+              (ans) => ans.timeSpentSeconds < 120 && !ans.userAnswer.includes('skipped')
           );
           if (a.id === 'time_master' && fastAnswer) unlock = true;
 
@@ -226,8 +220,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         currentSession,
         achievements,
         isLoading,
+        loading,
+        isAuthenticated,
         login,
         signup,
+        loginWithGoogle,
         logout,
         updateProfile,
         startSession,
