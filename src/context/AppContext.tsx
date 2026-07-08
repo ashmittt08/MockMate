@@ -1,15 +1,17 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { InterviewSession, FeedbackReport, Achievement } from '../types';
+import type { InterviewSession, FeedbackReport, Achievement, DbUser } from '../types';
 import { initialHistoricalInterviews, defaultAchievements } from '../data/mockInterviews';
 import { authService } from '../services/authService';
 import { interviewService } from '../services/interviewService';
 import { feedbackService } from '../services/feedbackService';
+import { userService } from '../services/userService';
 import { onAuthStateChanged } from 'firebase/auth';
 import type { User as FirebaseUser } from 'firebase/auth';
 import { auth } from '../lib/firebase';
 
 interface AppContextType {
   user: FirebaseUser | null;
+  dbUser: DbUser | null;
   interviews: FeedbackReport[];
   currentSession: InterviewSession | null;
   achievements: Achievement[];
@@ -37,6 +39,7 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [dbUser, setDbUser] = useState<DbUser | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isAuthenticated = !!user;
@@ -72,7 +75,23 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        try {
+          const syncedUser = await userService.syncUser({
+            firebaseUid: firebaseUser.uid,
+            name: firebaseUser.displayName || 'Google User',
+            email: firebaseUser.email || '',
+            photoUrl: firebaseUser.photoURL,
+          });
+          setDbUser(syncedUser);
+        } catch (error) {
+          console.error('Failed to sync user with database:', error);
+        }
+      } else {
+        setDbUser(null);
+      }
       setUser(firebaseUser);
       setLoading(false);
     });
@@ -124,6 +143,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     try {
       await authService.logout();
       setUser(null);
+      setDbUser(null);
       setCurrentSession(null);
       setInterviews(initialHistoricalInterviews);
       setAchievements(defaultAchievements);
@@ -216,6 +236,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     <AppContext.Provider
       value={{
         user,
+        dbUser,
         interviews,
         currentSession,
         achievements,

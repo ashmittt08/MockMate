@@ -6,3 +6,14 @@ export interface User {
   joinedDate: string;
   interviewsCompleted: number;
 }
+
+export interface DbUser {
+  id: string;
+  firebaseUid: string;
+  name: string;
+  email: string;
+  photoUrl: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
