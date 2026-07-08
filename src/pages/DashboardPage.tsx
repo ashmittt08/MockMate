@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import { ROUTES } from '../constants/routes';
+import { backendService } from '../services/backendService';
 import {
   Award,
   Video,
@@ -17,6 +18,33 @@ import {
 export const DashboardPage: React.FC = () => {
   const { user, interviews } = useApp();
   const navigate = useNavigate();
+  const [healthStatus, setHealthStatus] = useState<'loading' | 'connected' | 'offline'>('loading');
+
+  useEffect(() => {
+    let active = true;
+    const checkConnection = async () => {
+      try {
+        setHealthStatus('loading');
+        const res = await backendService.checkHealth();
+        if (active) {
+          if (res && res.success) {
+            setHealthStatus('connected');
+          } else {
+            setHealthStatus('offline');
+          }
+        }
+      } catch (err) {
+        if (active) {
+          setHealthStatus('offline');
+        }
+      }
+    };
+
+    checkConnection();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   // Calculations
   const totalInterviews = interviews.length;
@@ -59,9 +87,29 @@ export const DashboardPage: React.FC = () => {
       {/* Welcome Banner */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-white">
-            Dashboard
-          </h1>
+          <div className="flex items-center space-x-3">
+            <h1 className="text-3xl font-extrabold tracking-tight text-white">
+              Dashboard
+            </h1>
+            <div className="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-white/5 border border-white/10 shadow-sm">
+              {healthStatus === 'loading' && (
+                <span className="text-slate-400 flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-slate-400 animate-pulse" />
+                  Checking backend...
+                </span>
+              )}
+              {healthStatus === 'connected' && (
+                <span className="text-emerald-400 font-semibold">
+                  🟢 Backend Connected
+                </span>
+              )}
+              {healthStatus === 'offline' && (
+                <span className="text-rose-400 font-semibold">
+                  🔴 Backend Offline
+                </span>
+              )}
+            </div>
+          </div>
           <p className="text-sm text-app-muted mt-1">
             Welcome back, <strong className="text-white font-medium">{user?.displayName || 'User'}</strong>. Ready to practice?
           </p>
