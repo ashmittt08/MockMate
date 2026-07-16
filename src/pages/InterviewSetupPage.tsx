@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useInterview } from '../context/InterviewContext';
 import { ROUTES } from '../constants/routes';
 import type { RoleId } from '../constants/roles';
 import type { DifficultyId } from '../constants/difficulty';
@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const InterviewSetupPage: React.FC = () => {
-  const { startSession } = useApp();
+  const { startSession } = useInterview();
   const navigate = useNavigate();
 
   // Selection states

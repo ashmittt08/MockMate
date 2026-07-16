@@ -1,5 +1,5 @@
 export interface FeedbackSuggestion {
-  questionId: number;
+  questionId: string;
   questionText: string;
   userAnswer: string;
   modelAnswer: string;

@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
+import { InterviewProvider } from './context/InterviewContext';
 import { LandingPage } from './pages/LandingPage';
 import { LoginPage } from './pages/LoginPage';
 import { SignupPage } from './pages/SignupPage';
@@ -15,30 +16,32 @@ import { ROUTES } from './constants/routes';
 function App() {
   return (
     <AppProvider>
-      <BrowserRouter>
-        <Routes>
-          {/* Public Routes */}
-          <Route path={ROUTES.LANDING} element={<LandingPage />} />
+      <InterviewProvider>
+        <BrowserRouter>
+          <Routes>
+            {/* Public Routes */}
+            <Route path={ROUTES.LANDING} element={<LandingPage />} />
 
-          {/* Guest Only Routes (Login/Signup guarded) */}
-          <Route element={<AuthLayout />}>
-            <Route path={ROUTES.LOGIN} element={<LoginPage />} />
-            <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
-          </Route>
+            {/* Guest Only Routes (Login/Signup guarded) */}
+            <Route element={<AuthLayout />}>
+              <Route path={ROUTES.LOGIN} element={<LoginPage />} />
+              <Route path={ROUTES.SIGNUP} element={<SignupPage />} />
+            </Route>
 
-          {/* Guarded Workspace Routes */}
-          <Route element={<WorkspaceLayout />}>
-            <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
-            <Route path={ROUTES.INTERVIEW_SETUP} element={<InterviewSetupPage />} />
-            <Route path={ROUTES.INTERVIEW_SESSION} element={<InterviewSessionPage />} />
-            <Route path={ROUTES.FEEDBACK} element={<FeedbackPage />} />
-            <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
-          </Route>
+            {/* Guarded Workspace Routes */}
+            <Route element={<WorkspaceLayout />}>
+              <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
+              <Route path={ROUTES.INTERVIEW_SETUP} element={<InterviewSetupPage />} />
+              <Route path={ROUTES.INTERVIEW_SESSION} element={<InterviewSessionPage />} />
+              <Route path={ROUTES.FEEDBACK} element={<FeedbackPage />} />
+              <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+            </Route>
 
-          {/* Catch-all Redirect */}
-          <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
-        </Routes>
-      </BrowserRouter>
+            {/* Catch-all Redirect */}
+            <Route path="*" element={<Navigate to={ROUTES.LANDING} replace />} />
+          </Routes>
+        </BrowserRouter>
+      </InterviewProvider>
     </AppProvider>
   );
 }

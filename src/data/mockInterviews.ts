@@ -21,7 +21,7 @@ export const initialHistoricalInterviews: FeedbackReport[] = [
     ],
     suggestions: [
       {
-        questionId: 102,
+        questionId: '102',
         questionText: 'How would you optimize a slow React application that has heavy rendering loads and deep component trees?',
         userAnswer: 'I would use React.memo to cache my components and useMemo to save slow function calculations. Also, code-splitting with React.lazy is very good. And if I have a really big table, I would virtualize it.',
         modelAnswer: 'Optimizing a slow React app involves identifying and reducing unnecessary re-renders. Use React Profiler to find bottlenecks, useMemo and useCallback for reference stability, list virtualization for lists, lazy loading for route splitting, and optimize global states.',
@@ -50,7 +50,7 @@ export const initialHistoricalInterviews: FeedbackReport[] = [
     ],
     suggestions: [
       {
-        questionId: 101,
+        questionId: '101',
         questionText: 'Explain the concept of React Reconciliation and how the Virtual DOM works under the hood.',
         userAnswer: 'The virtual DOM is a Javascript copy of the HTML DOM. React makes changes on this copy first, then it does a diff to see what changes are needed, and puts it in the real DOM. That makes it faster.',
         modelAnswer: 'React reconciliation is the process through which React updates the DOM. When a component’s state or props change, React builds a new Virtual DOM tree, diffs it in O(n) complexity, and applies patches to the browser DOM.',

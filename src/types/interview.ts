@@ -1,11 +1,13 @@
 import type { Question } from './question';
 
 export interface Answer {
-  questionId: number;
+  questionId: string;
   questionText: string;
   userAnswer: string;
   timeSpentSeconds: number;
   hintUsed: boolean;
+  visited: boolean;
+  lastEdited: string; // ISO date string
 }
 
 export interface InterviewSession {
@@ -13,7 +15,7 @@ export interface InterviewSession {
   difficulty: 'Easy' | 'Medium' | 'Hard';
   type: 'Technical' | 'Behavioral';
   questions: Question[];
-  answers: Answer[];
+  answers: Record<string, Answer>; // Keyed by questionId
   activeQuestionIndex: number;
   timerSeconds: number;
   isCompleted: boolean;

@@ -16,8 +16,8 @@ export const feedbackService = {
         let communicationTotal = 0;
         let completenessTotal = 0;
 
-        const suggestions: FeedbackSuggestion[] = session.questions.map((q, idx) => {
-          const ans = session.answers[idx] || { userAnswer: '', timeSpentSeconds: 60, hintUsed: false };
+        const suggestions: FeedbackSuggestion[] = session.questions.map((q) => {
+          const ans = session.answers[q.id] || { userAnswer: '', timeSpentSeconds: 60, hintUsed: false, visited: false, lastEdited: '' };
           const answerLength = ans.userAnswer.trim().length;
 
           let score: number;
@@ -35,9 +35,11 @@ export const feedbackService = {
             if (ans.hintUsed) score -= 8; // Deduct for hints
             if (ans.timeSpentSeconds > 180) score -= 3; // Slight penalty for taking > 3 mins
 
-            const keywordMatches = q.modelAnswer.split(' ').filter(word => 
-              word.length > 5 && ans.userAnswer.toLowerCase().includes(word.toLowerCase().replace(/[^a-zA-Z]/g, ''))
-            ).length;
+            const keywordMatches = q.modelAnswer
+              ? q.modelAnswer.split(' ').filter(word => 
+                  word.length > 5 && ans.userAnswer.toLowerCase().includes(word.toLowerCase().replace(/[^a-zA-Z]/g, ''))
+                ).length
+              : 0;
 
             if (keywordMatches > 3) {
               score += 5;
@@ -69,7 +71,7 @@ export const feedbackService = {
             questionId: q.id,
             questionText: q.text,
             userAnswer: ans.userAnswer,
-            modelAnswer: q.modelAnswer,
+            modelAnswer: q.modelAnswer || 'Expected answers are evaluated securely on the backend.',
             feedbackText: feedback,
             score
           };

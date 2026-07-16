@@ -1,10 +1,9 @@
 export interface Question {
-  id: number;
+  id: string;
   text: string;
-  role: 'Frontend' | 'Backend' | 'Product Manager' | 'Data Scientist';
-  difficulty: 'Easy' | 'Medium' | 'Hard';
-  type: 'Technical' | 'Behavioral';
+  type: string;
   category: string;
-  modelAnswer: string;
   tips: string[];
+  order: number;
+  modelAnswer?: string;
 }

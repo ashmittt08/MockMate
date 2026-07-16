@@ -4,3 +4,4 @@ export * from './interview';
 export * from './feedback';
 export * from './achievement';
 export * from './api';
+export * from './interviewTemplate';

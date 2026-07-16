@@ -1,11 +1,13 @@
 import React from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useInterview } from '../context/InterviewContext';
 import { Sidebar } from './Sidebar';
 import { LoadingSpinner } from '../components/common/LoadingSpinner';
 
 export const WorkspaceLayout: React.FC = () => {
-  const { user, loading, currentSession } = useApp();
+  const { user, loading } = useApp();
+  const { currentSession } = useInterview();
   const location = useLocation();
 
   if (loading) {

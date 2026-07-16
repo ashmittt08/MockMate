@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { useInterview } from '../context/InterviewContext';
 import { ROUTES } from '../constants/routes';
 import { backendService } from '../services/backendService';
+import { interviewTemplateService } from '../services/interviewTemplateService';
+import type { InterviewTemplate } from '../types';
 import {
   Award,
   Video,
@@ -17,8 +20,42 @@ import {
 
 export const DashboardPage: React.FC = () => {
   const { user, interviews } = useApp();
+  const { startSessionFromTemplate } = useInterview();
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState<'loading' | 'connected' | 'offline'>('loading');
+
+  // Interview templates states
+  const [templates, setTemplates] = useState<InterviewTemplate[]>([]);
+  const [templatesLoading, setTemplatesLoading] = useState(true);
+  const [templatesError, setTemplatesError] = useState<string | null>(null);
+  const [sessionStarting, setSessionStarting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchTemplates = async () => {
+      try {
+        setTemplatesLoading(true);
+        const data = await interviewTemplateService.getInterviewTemplates();
+        if (active) {
+          setTemplates(data);
+          setTemplatesError(null);
+        }
+      } catch (err) {
+        if (active) {
+          setTemplatesError('Failed to load interview templates from backend.');
+        }
+      } finally {
+        if (active) {
+          setTemplatesLoading(false);
+        }
+      }
+    };
+
+    fetchTemplates();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -275,6 +312,87 @@ export const DashboardPage: React.FC = () => {
             </Link>
           </div>
         </div>
+      </div>
+
+      {/* Interview Templates Section */}
+      <div className="space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+            <span>Interview Practice Tracks</span>
+            <span className="bg-app-primary/10 text-app-primary text-[10px] font-bold px-2 py-0.5 rounded-full border border-app-primary/15">
+              Live Templates
+            </span>
+          </h3>
+          <p className="text-xs text-app-muted mt-1">Select a structured practice track below to start a live mock interview session.</p>
+        </div>
+
+        {templatesLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[1, 2, 3].map(n => (
+              <div key={n} className="h-36 rounded-2xl border border-white/5 bg-app-surface/20 animate-pulse" />
+            ))}
+          </div>
+        ) : templatesError ? (
+          <div className="rounded-xl border border-red-500/10 bg-red-500/5 p-4 text-xs text-red-400">
+            {templatesError}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {templates.map((template) => (
+              <button
+                key={template.id}
+                onClick={async () => {
+                  try {
+                    setSessionStarting(true);
+                    await startSessionFromTemplate(template.id);
+                    navigate(ROUTES.INTERVIEW_SESSION);
+                  } catch (err) {
+                    console.error(err);
+                    alert('Failed to start interview session. Please try again.');
+                  } finally {
+                    setSessionStarting(false);
+                  }
+                }}
+                disabled={sessionStarting}
+                className="text-left p-5 rounded-2xl border border-white/5 bg-app-surface/20 hover:border-white/10 hover:bg-app-surface/30 transition-all cursor-pointer group flex flex-col justify-between h-full min-h-[160px]"
+              >
+                <div>
+                  <div className="flex justify-between items-start gap-2">
+                    <h4 className="font-bold text-white text-sm group-hover:text-app-primary transition-colors">
+                      {template.title}
+                    </h4>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase shrink-0 border ${
+                      template.difficulty === 'Easy'
+                        ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                        : template.difficulty === 'Medium'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                        : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                    }`}>
+                      {template.difficulty}
+                    </span>
+                  </div>
+                  <p className="mt-2 text-xs text-app-muted leading-relaxed line-clamp-2">
+                    {template.description || 'Practice core role-specific competencies.'}
+                  </p>
+                </div>
+                
+                <div className="flex items-center justify-between mt-4 pt-3 border-t border-white/5 text-[10px] text-app-muted">
+                  <div className="flex items-center gap-3">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3 text-slate-500" />
+                      {template.duration} mins
+                    </span>
+                    <span>•</span>
+                    <span>{template.questionCount} questions</span>
+                  </div>
+                  <span className="text-app-primary group-hover:translate-x-0.5 transition-transform font-semibold flex items-center gap-0.5">
+                    Start <ArrowRight className="h-3 w-3" />
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Recent Interviews History Table */}

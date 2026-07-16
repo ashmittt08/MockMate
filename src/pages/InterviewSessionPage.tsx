@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useApp } from '../context/AppContext';
+import { useInterview } from '../context/InterviewContext';
 import { ROUTES } from '../constants/routes';
 import { LoadingState } from '../components/common/LoadingState';
 import {
@@ -8,68 +8,71 @@ import {
   Mic,
   Video,
   Lightbulb,
+  ChevronLeft,
   ChevronRight,
   AlertTriangle,
   StopCircle
 } from 'lucide-react';
 
 export const InterviewSessionPage: React.FC = () => {
-  const { currentSession, submitAnswer, skipQuestion, completeSession, resetSession, isLoading } = useApp();
+  const {
+    currentSession,
+    activeQuestionIndex,
+    currentQuestionTimeSpent,
+    progressPercent,
+    isLoading,
+    updateDraftAnswer,
+    skipQuestion,
+    goToQuestion,
+    nextQuestion,
+    prevQuestion,
+    completeSession,
+    resetSession
+  } = useInterview();
+  
   const navigate = useNavigate();
 
   // Local states
   const [answer, setAnswer] = useState('');
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [hintShown, setHintShown] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [micBars, setMicBars] = useState([40, 20, 50, 30, 60, 20, 40]);
   
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const micIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const dictationIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const activeQuestionIndex = currentSession?.activeQuestionIndex;
-
-  // React state adjustment during render when the question index changes
+  // Sync state when activeQuestionIndex changes
   const [prevIndex, setPrevIndex] = useState<number | undefined>(undefined);
   if (activeQuestionIndex !== undefined && activeQuestionIndex !== prevIndex) {
     setPrevIndex(activeQuestionIndex);
-    setElapsedSeconds(0);
-    setHintShown(false);
-    setAnswer('');
+    const targetQuestionId = currentSession?.questions[activeQuestionIndex]?.id;
+    if (targetQuestionId && currentSession) {
+      const savedAns = currentSession.answers[targetQuestionId];
+      setAnswer(savedAns?.userAnswer || '');
+      setHintShown(savedAns?.hintUsed || false);
+    } else {
+      setAnswer('');
+      setHintShown(false);
+    }
     setIsRecording(false);
   }
 
-  // If no active session, redirect to setup
+  // Redirect to setup if no active session
   useEffect(() => {
     if (!currentSession && !isLoading) {
       navigate(ROUTES.INTERVIEW_SETUP);
     }
   }, [currentSession, navigate, isLoading]);
 
-  // Stopwatch timer logic
+  // Clear dictation on index change
   useEffect(() => {
-    if (activeQuestionIndex === undefined) return;
-
-    // Clear dictation interval if active
     if (dictationIntervalRef.current) {
       clearInterval(dictationIntervalRef.current);
       dictationIntervalRef.current = null;
     }
-    
-    // Clear old timer if any
-    if (timerRef.current) clearInterval(timerRef.current);
-    
-    timerRef.current = setInterval(() => {
-      setElapsedSeconds((prev) => prev + 1);
-    }, 1000);
-
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
   }, [activeQuestionIndex]);
 
-  // Microphone waveform animation logic
+  // Mic animation
   useEffect(() => {
     micIntervalRef.current = setInterval(() => {
       setMicBars(prev => prev.map(() => Math.floor(Math.random() * 80) + 10));
@@ -87,7 +90,8 @@ export const InterviewSessionPage: React.FC = () => {
 
   if (!currentSession) return null;
 
-  const currentQuestion = currentSession.questions[currentSession.activeQuestionIndex];
+  const currentQuestion = currentSession.questions[activeQuestionIndex];
+  if (!currentQuestion) return null;
 
   // Format seconds into MM:SS
   const formatTime = (secs: number) => {
@@ -96,33 +100,46 @@ export const InterviewSessionPage: React.FC = () => {
     return `${mins.toString().padStart(2, '0')}:${remaining.toString().padStart(2, '0')}`;
   };
 
+  const handleAnswerChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const newText = e.target.value;
+    setAnswer(newText);
+    const targetQuestionId = currentSession?.questions[activeQuestionIndex]?.id;
+    if (targetQuestionId) {
+      updateDraftAnswer(targetQuestionId, newText);
+    }
+  };
+
   const handleNext = () => {
-    if (!currentSession) return;
-    submitAnswer(answer || 'No response typed.', elapsedSeconds, hintShown);
-    
-    // Check if it was the last question
-    if (currentSession.activeQuestionIndex + 1 >= currentSession.questions.length) {
-      completeSession().then((reportId) => {
+    const isLast = activeQuestionIndex + 1 === currentSession.questions.length;
+    if (isLast) {
+      completeSession(answer, hintShown).then((reportId) => {
         navigate(`${ROUTES.FEEDBACK_BASE}/${reportId}`);
       });
+    } else {
+      nextQuestion(answer, hintShown);
     }
+  };
+
+  const handlePrev = () => {
+    prevQuestion(answer, hintShown);
   };
 
   const handleSkip = () => {
-    if (!currentSession) return;
-    skipQuestion();
-    if (currentSession.activeQuestionIndex + 1 >= currentSession.questions.length) {
-      completeSession().then((reportId) => {
+    const isLast = activeQuestionIndex + 1 === currentSession.questions.length;
+    if (isLast) {
+      completeSession('Question skipped by candidate.', false).then((reportId) => {
         navigate(`${ROUTES.FEEDBACK_BASE}/${reportId}`);
       });
+    } else {
+      skipQuestion(currentQuestion.id);
     }
   };
 
-  // Simulated Speech-to-Text typing loop
-  const handleToggleDictation = () => {
-    if (!currentSession) return;
-    const currentQuestion = currentSession.questions[currentSession.activeQuestionIndex];
+  const handleNavigateToQuestion = (targetIndex: number) => {
+    goToQuestion(targetIndex, answer, hintShown);
+  };
 
+  const handleToggleDictation = () => {
     if (isRecording) {
       if (dictationIntervalRef.current) {
         clearInterval(dictationIntervalRef.current);
@@ -135,7 +152,7 @@ export const InterviewSessionPage: React.FC = () => {
     setIsRecording(true);
     
     // Simulate speech inputs based on question categories
-    const mockSpeechPhrases = currentQuestion.modelAnswer.split('. ');
+    const mockSpeechPhrases = currentQuestion.modelAnswer ? currentQuestion.modelAnswer.split('. ') : ['Mock response.'];
     let phraseIndex = 0;
 
     dictationIntervalRef.current = setInterval(() => {
@@ -150,7 +167,12 @@ export const InterviewSessionPage: React.FC = () => {
       
       setAnswer((prev) => {
         const punctuation = prev.trim() ? '. ' : '';
-        return prev + punctuation + mockSpeechPhrases[phraseIndex];
+        const newText = prev + punctuation + mockSpeechPhrases[phraseIndex];
+        const targetQuestionId = currentSession?.questions[activeQuestionIndex]?.id;
+        if (targetQuestionId) {
+          updateDraftAnswer(targetQuestionId, newText);
+        }
+        return newText;
       });
       
       phraseIndex++;
@@ -165,7 +187,6 @@ export const InterviewSessionPage: React.FC = () => {
   };
 
   const totalQuestions = currentSession.questions.length;
-  const progressPercent = ((currentSession.activeQuestionIndex + 1) / totalQuestions) * 100;
 
   return (
     <div className="space-y-6 pb-12">
@@ -191,8 +212,9 @@ export const InterviewSessionPage: React.FC = () => {
         <div className="flex justify-between text-xs text-app-muted">
           <span>Question progress</span>
           <span>
-            <strong className="text-white">{currentSession.activeQuestionIndex + 1}</strong> of{' '}
+            Question <strong className="text-white">{activeQuestionIndex + 1}</strong> of{' '}
             <strong className="text-white">{totalQuestions}</strong>
+            <span className="text-[10px] text-app-primary font-semibold ml-2">({progressPercent}% Completed)</span>
           </span>
         </div>
         <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
@@ -232,13 +254,13 @@ export const InterviewSessionPage: React.FC = () => {
               </span>
               <div className="flex items-center space-x-2 text-xs text-app-muted">
                 <Clock className="h-4 w-4 text-app-primary" />
-                <span>Timer: <strong className="font-mono text-slate-200">{formatTime(elapsedSeconds)}</strong></span>
+                <span>Timer: <strong className="font-mono text-slate-200">{formatTime(currentQuestionTimeSpent)}</strong></span>
               </div>
             </div>
 
             <textarea
               value={answer}
-              onChange={(e) => setAnswer(e.target.value)}
+              onChange={handleAnswerChange}
               placeholder="Type your structured solution here. You can also click the microphone to simulate audio input..."
               rows={9}
               className="block w-full rounded-xl border border-white/10 bg-slate-950/60 p-4 text-sm text-white placeholder-slate-500 focus:border-app-primary focus:ring-1 focus:ring-app-primary outline-none transition-all resize-none font-sans leading-relaxed"
@@ -286,16 +308,25 @@ export const InterviewSessionPage: React.FC = () => {
                 </button>
               </div>
 
-              <div className="flex items-center space-x-4">
-                <span className="text-[11px] text-app-muted font-mono">
+              <div className="flex items-center space-x-3">
+                <span className="text-[11px] text-app-muted font-mono mr-2">
                   {answer.trim().length} chars
                 </span>
+                {activeQuestionIndex > 0 && (
+                  <button
+                    onClick={handlePrev}
+                    className="inline-flex items-center justify-center space-x-1 rounded-xl border border-white/5 hover:border-white/10 bg-white/5 hover:bg-white/10 px-4 py-2.5 text-xs font-bold text-slate-300 hover:text-white transition-all cursor-pointer"
+                  >
+                    <ChevronLeft className="h-4 w-4" />
+                    <span>Prev</span>
+                  </button>
+                )}
                 <button
                   onClick={handleNext}
                   className="inline-flex items-center justify-center space-x-1 rounded-xl bg-app-primary px-4.5 py-2.5 text-xs font-bold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10 cursor-pointer"
                 >
                   <span>
-                    {currentSession.activeQuestionIndex + 1 === totalQuestions
+                    {activeQuestionIndex + 1 === totalQuestions
                       ? 'Complete Simulation'
                       : 'Save & Next'}
                   </span>
@@ -306,8 +337,62 @@ export const InterviewSessionPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Side: Webcam Simulator & Mic Levels */}
+        {/* Right Side: Navigator, Webcam Simulator & Mic Levels */}
         <div className="space-y-6">
+          {/* Assessment Navigator Panel */}
+          <div className="rounded-2xl border border-white/5 bg-app-surface/20 p-5 space-y-4">
+            <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+              Assessment Navigator
+            </h3>
+            
+            <div className="grid grid-cols-1 gap-2">
+              {currentSession.questions.map((q, idx) => {
+                const isCurrent = idx === activeQuestionIndex;
+                const ans = currentSession.answers[q.id];
+                
+                let statusText = 'Unanswered';
+                let statusColor = 'text-slate-400 bg-slate-500/5 border-white/5';
+                
+                if (ans) {
+                  if (ans.userAnswer.includes('Question skipped by candidate.')) {
+                    statusText = 'Skipped';
+                    statusColor = 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
+                  } else if (ans.userAnswer.trim().length > 0) {
+                    statusText = 'Answered';
+                    statusColor = 'text-emerald-400 bg-emerald-500/10 border-emerald-500/20';
+                  } else if (ans.visited) {
+                    statusText = 'Visited';
+                    statusColor = 'text-blue-400 bg-blue-500/10 border-blue-500/20';
+                  }
+                }
+
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => handleNavigateToQuestion(idx)}
+                    className={`w-full text-left p-3 rounded-xl border flex items-center justify-between transition-all cursor-pointer ${
+                      isCurrent
+                        ? 'border-app-primary bg-app-primary/5 shadow-md shadow-app-primary/5'
+                        : 'border-white/5 bg-slate-950/20 hover:border-white/10 hover:bg-slate-950/40'
+                    }`}
+                  >
+                    <div className="flex flex-col gap-0.5 min-w-0 pr-2">
+                      <span className={`text-[9px] uppercase font-bold tracking-wider ${isCurrent ? 'text-app-primary' : 'text-app-muted'}`}>
+                        Question {idx + 1}
+                      </span>
+                      <span className="text-xs font-semibold text-white truncate">
+                        {q.text}
+                      </span>
+                    </div>
+                    <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border shrink-0 ${statusColor}`}>
+                      {statusText}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Webcam Simulator Panel */}
           <div className="rounded-2xl border border-white/5 bg-app-surface/20 p-5 space-y-4">
             <h3 className="text-xs font-bold text-slate-300 uppercase tracking-wider">
