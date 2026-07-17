@@ -1,5 +1,6 @@
 import type { InterviewSession, Answer } from '../types';
 import { questionService } from './questionService';
+import apiClient from '../api/apiClient';
 
 export const interviewService = {
   createSession: async (
@@ -7,7 +8,7 @@ export const interviewService = {
     difficulty: 'Easy' | 'Medium' | 'Hard',
     type: 'Technical' | 'Behavioral'
   ): Promise<InterviewSession> => {
-    const questions = await questionService.getQuestionsForSession(role, difficulty, type);
+    const { questions, templateId } = await questionService.getQuestionsForSession(role, difficulty, type);
     const answers: Record<string, Answer> = {};
     
     questions.forEach((q) => {
@@ -27,6 +28,7 @@ export const interviewService = {
     }
 
     return {
+      templateId,
       role,
       difficulty,
       type,
@@ -94,5 +96,47 @@ export const interviewService = {
         [questionId]: updatedAnswer
       }
     };
+  },
+
+  // Backend API persistent session integrations
+  async createBackendSession(firebaseUid: string, templateId: string): Promise<string> {
+    const response = await apiClient.post<{ success: boolean; data: { id: string } }>('/api/interview-sessions', {
+      firebaseUid,
+      templateId,
+    });
+    return response.data.data.id;
+  },
+
+  async saveBackendAnswer(
+    sessionId: string,
+    data: {
+      questionId: string;
+      userAnswer: string;
+      status: 'ANSWERED' | 'SKIPPED';
+      timeSpentSeconds: number;
+      hintUsed: boolean;
+      visited: boolean;
+    }
+  ): Promise<any> {
+    const response = await apiClient.post<{ success: boolean; data: any }>(
+      `/api/interview-sessions/${sessionId}/answers`,
+      data
+    );
+    return response.data;
+  },
+
+  async completeBackendSession(sessionId: string, totalTime: number): Promise<any> {
+    const response = await apiClient.patch<{ success: boolean; data: any }>(
+      `/api/interview-sessions/${sessionId}/complete`,
+      { totalTime }
+    );
+    return response.data;
+  },
+
+  async getBackendSession(sessionId: string): Promise<any> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `/api/interview-sessions/${sessionId}`
+    );
+    return response.data.data;
   }
 };

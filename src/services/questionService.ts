@@ -23,7 +23,7 @@ export const questionService = {
     role: 'Frontend' | 'Backend' | 'Product Manager' | 'Data Scientist',
     difficulty: 'Easy' | 'Medium' | 'Hard',
     type: 'Technical' | 'Behavioral'
-  ): Promise<Question[]> {
+  ): Promise<{ questions: Question[]; templateId: string }> {
     try {
       const templates = await interviewTemplateService.getInterviewTemplates();
       if (templates.length === 0) {
@@ -57,7 +57,10 @@ export const questionService = {
       const allQuestions = await interviewTemplateService.getInterviewQuestions(matchedTemplate.id);
       
       // Return up to 3 questions for the session (maintains consistent session size)
-      return allQuestions.slice(0, 3);
+      return {
+        questions: allQuestions.slice(0, 3),
+        templateId: matchedTemplate.id
+      };
     } catch (error) {
       console.error('Failed to get session questions from backend:', error);
       throw error;

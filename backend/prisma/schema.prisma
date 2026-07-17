@@ -11,27 +11,27 @@ datasource db {
 }
 
 model User {
-  id          String   @id @default(cuid())
-  firebaseUid String   @unique
-  name        String
-  email       String   @unique
-  photoUrl    String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                String             @id @default(cuid())
+  firebaseUid       String             @unique
+  name              String
+  email             String             @unique
+  photoUrl          String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  interviewSessions InterviewSession[]
 }
 
 model InterviewTemplate {
-  id          String  @id @default(cuid())
-  title       String
-  role        String
-  difficulty  String
-  duration    Int
-  description String?
-
-  questions Question[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                String             @id @default(cuid())
+  title             String
+  role              String
+  difficulty        String
+  duration          Int
+  description       String?
+  questions         Question[]
+  interviewSessions InterviewSession[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
 
 model Question {
@@ -43,4 +43,49 @@ model Question {
   expectedAnswer      String?
   order               Int
   createdAt           DateTime          @default(now())
+  answers             InterviewAnswer[]
+}
+
+enum SessionStatus {
+  ACTIVE
+  COMPLETED
+  ABANDONED
+}
+
+enum AnswerStatus {
+  ANSWERED
+  SKIPPED
+}
+
+model InterviewSession {
+  id                  String            @id @default(cuid())
+  userId              String
+  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interviewTemplateId String
+  interviewTemplate   InterviewTemplate @relation(fields: [interviewTemplateId], references: [id], onDelete: Cascade)
+  status              SessionStatus     @default(ACTIVE)
+  startedAt           DateTime          @default(now())
+  completedAt         DateTime?
+  totalTime           Int               @default(0)
+  answers             InterviewAnswer[]
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+}
+
+model InterviewAnswer {
+  id                 String           @id @default(cuid())
+  interviewSessionId String
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+  questionId         String
+  question           Question         @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  userAnswer         String
+  status             AnswerStatus     @default(ANSWERED)
+  timeSpentSeconds   Int              @default(0)
+  hintUsed           Boolean          @default(false)
+  visited            Boolean          @default(false)
+  lastEditedAt       DateTime         @default(now()) @updatedAt
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@unique([interviewSessionId, questionId])
 }

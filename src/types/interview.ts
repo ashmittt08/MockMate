@@ -11,6 +11,8 @@ export interface Answer {
 }
 
 export interface InterviewSession {
+  id?: string;
+  templateId?: string;
   role: 'Frontend' | 'Backend' | 'Product Manager' | 'Data Scientist';
   difficulty: 'Easy' | 'Medium' | 'Hard';
   type: 'Technical' | 'Behavioral';

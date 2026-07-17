@@ -27,7 +27,10 @@ export const InterviewSessionPage: React.FC = () => {
     nextQuestion,
     prevQuestion,
     completeSession,
-    resetSession
+    resetSession,
+    syncStatus,
+    apiError,
+    clearApiError
   } = useInterview();
   
   const navigate = useNavigate();
@@ -197,6 +200,36 @@ export const InterviewSessionPage: React.FC = () => {
             ACTIVE ASSESSMENT
           </span>
           <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping"></span>
+          
+          {/* Cloud Sync Status Indicator */}
+          {syncStatus && (
+            <span className="flex items-center space-x-1 text-[9px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded bg-slate-900 border border-white/5 font-mono">
+              {syncStatus === 'saving' && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-yellow-400 animate-pulse mr-1"></span>
+                  <span className="text-yellow-400/80 animate-pulse">Syncing...</span>
+                </>
+              )}
+              {syncStatus === 'saved' && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 mr-1"></span>
+                  <span className="text-emerald-400/85">Cloud Synced</span>
+                </>
+              )}
+              {syncStatus === 'error' && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-red-400 mr-1 animate-ping"></span>
+                  <span className="text-red-400/85">Offline Cache</span>
+                </>
+              )}
+              {syncStatus === 'idle' && (
+                <>
+                  <span className="h-1.5 w-1.5 rounded-full bg-slate-500 mr-1"></span>
+                  <span className="text-slate-400/80">Cloud Connected</span>
+                </>
+              )}
+            </span>
+          )}
         </div>
         <button
           onClick={handleCancelSession}
@@ -206,6 +239,22 @@ export const InterviewSessionPage: React.FC = () => {
           <span>Exit Simulation</span>
         </button>
       </div>
+
+      {/* Unobtrusive API Error Notification Banner */}
+      {apiError && (
+        <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-xs text-red-400 flex items-center justify-between animate-fadeIn shadow-lg">
+          <div className="flex items-center space-x-2">
+            <AlertTriangle className="h-4 w-4 shrink-0 text-red-400 animate-bounce" />
+            <span>{apiError}</span>
+          </div>
+          <button
+            onClick={clearApiError}
+            className="text-[9px] font-bold text-red-400 hover:text-white uppercase tracking-wider px-2 py-1 rounded bg-red-500/15 hover:bg-red-500/30 transition-all border border-red-500/10 cursor-pointer ml-4"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Progress indicators bar */}
       <div className="space-y-1.5">
