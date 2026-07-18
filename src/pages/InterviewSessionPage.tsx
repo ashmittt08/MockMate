@@ -30,7 +30,11 @@ export const InterviewSessionPage: React.FC = () => {
     resetSession,
     syncStatus,
     apiError,
-    clearApiError
+    clearApiError,
+    remainingSeconds,
+    timerStatus,
+    autoSubmittedReportId,
+    clearAutoSubmittedReportId
   } = useInterview();
   
   const navigate = useNavigate();
@@ -67,6 +71,14 @@ export const InterviewSessionPage: React.FC = () => {
     }
   }, [currentSession, navigate, isLoading]);
 
+  // Redirect to results if auto-submitted
+  useEffect(() => {
+    if (autoSubmittedReportId) {
+      navigate(`${ROUTES.FEEDBACK_BASE}/${autoSubmittedReportId}`);
+      clearAutoSubmittedReportId();
+    }
+  }, [autoSubmittedReportId, navigate, clearAutoSubmittedReportId]);
+
   // Clear dictation on index change
   useEffect(() => {
     if (dictationIntervalRef.current) {
@@ -86,6 +98,24 @@ export const InterviewSessionPage: React.FC = () => {
       if (dictationIntervalRef.current) clearInterval(dictationIntervalRef.current);
     };
   }, []);
+
+  // Format seconds into HH:MM:SS or MM:SS
+  const formatCountdownTime = (secs: number) => {
+    const hours = Math.floor(secs / 3600);
+    const mins = Math.floor((secs % 3600) / 60);
+    const remaining = secs % 60;
+    
+    const parts = [];
+    if (hours > 0) parts.push(hours.toString().padStart(2, '0'));
+    parts.push(mins.toString().padStart(2, '0'));
+    parts.push(remaining.toString().padStart(2, '0'));
+    
+    return parts.join(':');
+  };
+
+  if (remainingSeconds === 0 && currentSession && !currentSession.isCompleted) {
+    return <LoadingState message="Time expired! Automatically submitting your assessment..." fullScreen />;
+  }
 
   if (isLoading) {
     return <LoadingState message="Analyzing your responses with AI Evaluation Engine..." fullScreen />;
@@ -195,11 +225,25 @@ export const InterviewSessionPage: React.FC = () => {
     <div className="space-y-6 pb-12">
       {/* Session Header Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <span className="text-xs text-app-muted font-bold tracking-widest uppercase">
-            ACTIVE ASSESSMENT
-          </span>
-          <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping"></span>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-3">
+            <span className="text-xs text-app-muted font-bold tracking-widest uppercase">
+              ACTIVE ASSESSMENT
+            </span>
+            <span className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping"></span>
+          </div>
+
+          {/* Live Countdown Timer */}
+          <div className={`inline-flex items-center space-x-2 px-3 py-1.5 rounded-xl border text-xs font-bold font-mono transition-all duration-300 ${
+            timerStatus === 'critical'
+              ? 'bg-red-500/10 border-red-500/30 text-red-400 animate-pulse'
+              : timerStatus === 'warning'
+                ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400'
+                : 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400'
+          }`}>
+            <Clock className={`h-4 w-4 ${timerStatus === 'critical' ? 'text-red-400' : timerStatus === 'warning' ? 'text-yellow-400' : 'text-emerald-400'}`} />
+            <span>Time Remaining: {formatCountdownTime(remainingSeconds)}</span>
+          </div>
           
           {/* Cloud Sync Status Indicator */}
           {syncStatus && (

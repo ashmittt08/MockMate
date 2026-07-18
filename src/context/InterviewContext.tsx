@@ -28,6 +28,11 @@ interface InterviewContextType {
   prevQuestion: (currentAnswerText: string, hintUsed: boolean) => void;
   completeSession: (finalAnswerText: string, finalHintUsed: boolean) => Promise<string>;
   resetSession: () => void;
+  remainingSeconds: number;
+  timerStatus: 'normal' | 'warning' | 'critical';
+  autoSubmittedReportId: string | null;
+  clearAutoSubmittedReportId: () => void;
+  autoCompleteSession: () => Promise<string>;
 }
 
 const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
@@ -45,6 +50,25 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Auto-submission and navigation state
+  const isAutoSubmitting = useRef(false);
+  const [autoSubmittedReportId, setAutoSubmittedReportId] = useState<string | null>(null);
+
+  const clearAutoSubmittedReportId = () => setAutoSubmittedReportId(null);
+
+  // Document visibility state to pause/resume the countdown
+  const [isDocumentVisible, setIsDocumentVisible] = useState(!document.hidden);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setIsDocumentVisible(document.visibilityState === 'visible');
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
 
   const saveDebounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentSessionRef = useRef<InterviewSession | null>(null);
@@ -88,11 +112,55 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [currentSession]);
 
-  // Stopwatch timer logic inside the provider
+  // Calculate remaining seconds directly using backend startedAt as the source of truth
+  const getRemainingSeconds = (session: InterviewSession | null): number => {
+    if (!session || !session.startedAt || !session.duration) return 0;
+    const startedTime = new Date(session.startedAt).getTime();
+    const durationMs = session.duration * 60 * 1000;
+    const expirationTime = startedTime + durationMs;
+    const now = Date.now();
+    return Math.max(0, Math.floor((expirationTime - now) / 1000));
+  };
+
+  const [remainingSeconds, setRemainingSeconds] = useState<number>(() => getRemainingSeconds(currentSession));
+
+  useEffect(() => {
+    setRemainingSeconds(getRemainingSeconds(currentSession));
+  }, [currentSession?.id, currentSession?.startedAt, currentSession?.duration]);
+
+  const timerStatus = (() => {
+    if (remainingSeconds <= 60) return 'critical';
+    if (remainingSeconds <= 300) return 'warning';
+    return 'normal';
+  })();
+
+  // Live timer countdown and elapsed stopwatch tick logic
   useEffect(() => {
     if (!currentSession || currentSession.isCompleted) return;
+    
+    // Pause interval if document is hidden
+    if (!isDocumentVisible) return;
+
+    // Immediately update on mount/visibility restore
+    const initialRemaining = getRemainingSeconds(currentSessionRef.current);
+    setRemainingSeconds(initialRemaining);
+    
+    if (initialRemaining <= 0) {
+      autoCompleteSession();
+      return;
+    }
 
     const interval = setInterval(() => {
+      const calculatedRemaining = getRemainingSeconds(currentSessionRef.current);
+      setRemainingSeconds(calculatedRemaining);
+
+      if (calculatedRemaining <= 0) {
+        clearInterval(interval);
+        autoCompleteSession();
+        return;
+      }
+
+      // Increment question and session elapsed stopwatch timers
       setCurrentQuestionTimeSpent((prev) => prev + 1);
       setCurrentSession((prevSession) => {
         if (!prevSession) return null;
@@ -127,7 +195,12 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentSession === null, currentSession?.activeQuestionIndex, currentSession?.isCompleted]);
+  }, [
+    currentSession === null,
+    currentSession?.activeQuestionIndex,
+    currentSession?.isCompleted,
+    isDocumentVisible
+  ]);
 
   // Queue and Retry synchronization helpers
   const addToSyncQueue = (item: { sessionId: string; answerData: any }) => {
@@ -227,30 +300,79 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (backendSession) {
         // Resume only ACTIVE sessions
         if (backendSession.status === 'ACTIVE') {
-          setCurrentSession((prev) => {
-            if (!prev || prev.id !== sessionId) return prev;
-            
-            const updatedAnswers = { ...prev.answers };
-            backendSession.answers.forEach((ans: any) => {
-              const q = prev.questions.find((quest) => quest.id === ans.questionId);
-              updatedAnswers[ans.questionId] = {
-                questionId: ans.questionId,
-                questionText: q ? q.text : '',
-                userAnswer: ans.userAnswer,
-                timeSpentSeconds: ans.timeSpentSeconds,
-                hintUsed: ans.hintUsed,
-                visited: ans.visited,
-                lastEdited: ans.lastEditedAt
-              };
-            });
+          const duration = backendSession.interviewTemplate?.duration || 30;
+          const startedTime = new Date(backendSession.startedAt).getTime();
+          const expirationTime = startedTime + duration * 60 * 1000;
+          const isExpired = Date.now() >= expirationTime;
 
-            return {
-              ...prev,
-              timerSeconds: backendSession.totalTime || prev.timerSeconds,
-              answers: updatedAnswers
+          const updatedAnswers: Record<string, Answer> = {};
+          
+          // Re-assemble questions if not locally stored
+          const questions = backendSession.interviewTemplate?.questions?.map((q: any) => ({
+            id: q.id,
+            text: q.question,
+            type: q.type,
+            category: q.type,
+            tips: [
+              "Focus on key concepts and define important terminology.",
+              "Provide a real-world scenario or project where you implemented this approach.",
+              "Discuss any trade-offs, advantages, or limitations associated with this choice."
+            ],
+            order: q.order,
+            modelAnswer: q.expectedAnswer
+          })).slice(0, 3) || [];
+
+          backendSession.answers.forEach((ans: any) => {
+            const q = questions.find((quest: any) => quest.id === ans.questionId);
+            updatedAnswers[ans.questionId] = {
+              questionId: ans.questionId,
+              questionText: q ? q.text : '',
+              userAnswer: ans.userAnswer,
+              timeSpentSeconds: ans.timeSpentSeconds,
+              hintUsed: ans.hintUsed,
+              visited: ans.visited,
+              lastEdited: ans.lastEditedAt
             };
           });
+
+          // Fallback if questions are empty
+          const localSession = currentSessionRef.current;
+          const finalQuestions = questions.length > 0 ? questions : (localSession?.questions || []);
+          
+          if (finalQuestions.length > 0 && !updatedAnswers[finalQuestions[0].id]) {
+            updatedAnswers[finalQuestions[0].id] = {
+              questionId: finalQuestions[0].id,
+              questionText: finalQuestions[0].text,
+              userAnswer: '',
+              timeSpentSeconds: 0,
+              hintUsed: false,
+              visited: true,
+              lastEdited: new Date().toISOString()
+            };
+          }
+
+          const session: InterviewSession = {
+            id: sessionId,
+            templateId: backendSession.interviewTemplateId,
+            role: backendSession.interviewTemplate?.role || localSession?.role || 'Frontend',
+            difficulty: backendSession.interviewTemplate?.difficulty || localSession?.difficulty || 'Medium',
+            type: (backendSession.interviewTemplate?.title?.toLowerCase().includes('hr') || backendSession.answers.some((ans: any) => ans.question?.type?.toLowerCase().includes('behavioral'))) ? 'Behavioral' : 'Technical',
+            questions: finalQuestions,
+            answers: updatedAnswers,
+            activeQuestionIndex: localSession?.activeQuestionIndex || 0,
+            timerSeconds: backendSession.totalTime || localSession?.timerSeconds || 0,
+            isCompleted: false,
+            startedAt: backendSession.startedAt,
+            duration: duration
+          };
+
+          setCurrentSession(session);
           setSyncStatus('saved');
+
+          if (isExpired) {
+            console.log("Resumed ACTIVE session is already expired. Auto-submitting...");
+            await autoCompleteSessionWithObject(session);
+          }
         } else {
           // Clear finished or inactive sessions from local storage cache
           console.warn(`Local session is ${backendSession.status} on backend. Clearing cache.`);
@@ -283,14 +405,23 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (user?.uid && session.templateId) {
         try {
           setSyncStatus('saving');
-          const backendSessionId = await interviewService.createBackendSession(user.uid, session.templateId);
-          session.id = backendSessionId;
+          const backendDetails = await interviewService.createBackendSession(user.uid, session.templateId);
+          session.id = backendDetails.id;
+          session.startedAt = backendDetails.startedAt;
+          session.duration = backendDetails.interviewTemplate?.duration;
           setSyncStatus('saved');
         } catch (err) {
           console.error("Failed to create session on backend:", err);
           setSyncStatus('error');
           setApiError("Failed to sync new session to backend. Your progress will be saved locally.");
         }
+      }
+
+      if (!session.startedAt) {
+        session.startedAt = new Date().toISOString();
+      }
+      if (!session.duration) {
+        session.duration = 30; // default to 30 mins
       }
 
       setCurrentSession(session);
@@ -336,20 +467,31 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         answers,
         activeQuestionIndex: 0,
         timerSeconds: 0,
-        isCompleted: false
+        isCompleted: false,
+        duration: template.duration,
+        startedAt: new Date().toISOString()
       };
       
       if (user?.uid) {
         try {
           setSyncStatus('saving');
-          const backendSessionId = await interviewService.createBackendSession(user.uid, templateId);
-          session.id = backendSessionId;
+          const backendDetails = await interviewService.createBackendSession(user.uid, templateId);
+          session.id = backendDetails.id;
+          session.startedAt = backendDetails.startedAt;
+          session.duration = backendDetails.interviewTemplate?.duration || template.duration;
           setSyncStatus('saved');
         } catch (err) {
           console.error("Failed to create session on backend:", err);
           setSyncStatus('error');
           setApiError("Failed to sync new template session to backend. Your progress will be saved locally.");
         }
+      }
+
+      if (!session.startedAt) {
+        session.startedAt = new Date().toISOString();
+      }
+      if (!session.duration) {
+        session.duration = template.duration || 30;
       }
 
       setCurrentSession(session);
@@ -589,6 +731,9 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           await processSyncQueue();
         }
 
+        // Allow a brief grace period for network completion
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
         // Finalize backend session
         await interviewService.completeBackendSession(finalSession.id, finalSession.timerSeconds);
       }
@@ -609,6 +754,87 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } finally {
       setIsLoading(false);
     }
+  };
+
+  // Perform full auto-submission under context control
+  const autoCompleteSessionWithObject = async (sessionToSubmit: InterviewSession | null): Promise<string> => {
+    if (!sessionToSubmit || isAutoSubmitting.current) return '';
+    isAutoSubmitting.current = true;
+    setIsLoading(true);
+    setApiError(null);
+    setSyncStatus('saving');
+
+    if (saveDebounceTimeoutRef.current) {
+      clearTimeout(saveDebounceTimeoutRef.current);
+      saveDebounceTimeoutRef.current = null;
+    }
+
+    try {
+      const activeQuestion = sessionToSubmit.questions[sessionToSubmit.activeQuestionIndex];
+      const activeAns = activeQuestion ? sessionToSubmit.answers[activeQuestion.id] : null;
+
+      if (sessionToSubmit.id) {
+        // 1. Flush the active question's draft answer immediately
+        if (activeQuestion && activeAns) {
+          try {
+            await interviewService.saveBackendAnswer(sessionToSubmit.id, {
+              questionId: activeQuestion.id,
+              userAnswer: activeAns.userAnswer,
+              status: activeAns.userAnswer === 'Question skipped by candidate.' ? 'SKIPPED' : 'ANSWERED',
+              timeSpentSeconds: activeAns.timeSpentSeconds,
+              hintUsed: activeAns.hintUsed,
+              visited: true
+            });
+          } catch (err) {
+            console.error("Failed to save final question draft in auto-submit:", err);
+          }
+        }
+
+        // 2. Flush any outstanding queue items
+        if (syncQueueRef.current.length > 0) {
+          try {
+            await processSyncQueue();
+          } catch (err) {
+            console.error("Failed to flush sync queue in auto-submit:", err);
+          }
+        }
+
+        // 3. Grace period for any concurrent/pending network completion
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+
+        // 4. Complete session on the backend
+        await interviewService.completeBackendSession(sessionToSubmit.id, sessionToSubmit.timerSeconds);
+      }
+
+      // Generate report and complete locally
+      const report = await feedbackService.generateFeedbackReport(sessionToSubmit);
+      addFeedbackReport(report, sessionToSubmit);
+
+      // Local state is cleared only AFTER successful server completion
+      setCurrentSession(null);
+      localStorage.removeItem('mockmate_current_session');
+      setSyncStatus('idle');
+      setAutoSubmittedReportId(report.id);
+      return report.id;
+    } catch (error) {
+      console.error('Failed to auto-complete session:', error);
+      setSyncStatus('error');
+      setApiError('Auto-submit failed. Retrying in 3 seconds...');
+      isAutoSubmitting.current = false;
+      
+      // Auto retry after 3 seconds
+      setTimeout(() => {
+        autoCompleteSessionWithObject(sessionToSubmit);
+      }, 3000);
+      
+      throw error;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const autoCompleteSession = async (): Promise<string> => {
+    return autoCompleteSessionWithObject(currentSessionRef.current);
   };
 
   const resetSession = () => {
@@ -652,7 +878,12 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         nextQuestion,
         prevQuestion,
         completeSession,
-        resetSession
+        resetSession,
+        remainingSeconds,
+        timerStatus,
+        autoSubmittedReportId,
+        clearAutoSubmittedReportId,
+        autoCompleteSession
       }}
     >
       {children}

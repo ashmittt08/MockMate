@@ -21,4 +21,6 @@ export interface InterviewSession {
   activeQuestionIndex: number;
   timerSeconds: number;
   isCompleted: boolean;
+  duration?: number;
+  startedAt?: string;
 }

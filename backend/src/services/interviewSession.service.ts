@@ -19,6 +19,7 @@ export const interviewSessionService = {
       where: { id },
       include: {
         answers: true,
+        interviewTemplate: true,
       },
     });
   },
@@ -56,6 +57,7 @@ export const interviewSessionService = {
       },
       include: {
         answers: true,
+        interviewTemplate: true,
       },
     });
   },
@@ -72,6 +74,13 @@ export const interviewSessionService = {
     if (!session) {
       const error = new Error(`Interview session with ID "${sessionId}" not found`);
       (error as any).statusCode = 404;
+      throw error;
+    }
+
+    // Verify session is active
+    if (session.status !== SessionStatus.ACTIVE) {
+      const error = new Error(`Interview session is not active (status: ${session.status})`);
+      (error as any).statusCode = 400;
       throw error;
     }
 
@@ -134,6 +143,13 @@ export const interviewSessionService = {
       throw error;
     }
 
+    // Verify session is active
+    if (session.status !== SessionStatus.ACTIVE) {
+      const error = new Error(`Interview session is not active (status: ${session.status})`);
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
     return prisma.interviewSession.update({
       where: { id: sessionId },
       data: {
@@ -143,6 +159,7 @@ export const interviewSessionService = {
       },
       include: {
         answers: true,
+        interviewTemplate: true,
       },
     });
   },

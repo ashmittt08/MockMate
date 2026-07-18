@@ -99,12 +99,15 @@ export const interviewService = {
   },
 
   // Backend API persistent session integrations
-  async createBackendSession(firebaseUid: string, templateId: string): Promise<string> {
-    const response = await apiClient.post<{ success: boolean; data: { id: string } }>('/api/interview-sessions', {
+  async createBackendSession(
+    firebaseUid: string,
+    templateId: string
+  ): Promise<{ id: string; startedAt: string; interviewTemplate?: { duration: number } }> {
+    const response = await apiClient.post<{ success: boolean; data: any }>('/api/interview-sessions', {
       firebaseUid,
       templateId,
     });
-    return response.data.data.id;
+    return response.data.data;
   },
 
   async saveBackendAnswer(
