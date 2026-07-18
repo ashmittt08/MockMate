@@ -1,5 +1,6 @@
 import { prisma } from '../database/prisma';
 import { SessionStatus, AnswerStatus } from '@prisma/client';
+import { aiEvaluationService } from './ai/evaluation.service';
 
 export interface SaveAnswerInput {
   questionId: string;
@@ -37,6 +38,34 @@ export const interviewSessionService = {
       const error = new Error(`User with firebaseUid "${firebaseUid}" not found`);
       (error as any).statusCode = 404;
       throw error;
+    }
+
+    // Check for an existing active session
+    const activeSession = await prisma.interviewSession.findFirst({
+      where: {
+        userId: user.id,
+        status: SessionStatus.ACTIVE,
+      },
+      include: {
+        interviewTemplate: true,
+      },
+    });
+
+    if (activeSession) {
+      const durationMinutes = activeSession.interviewTemplate.duration;
+      const startedAtMs = new Date(activeSession.startedAt).getTime();
+      const expiresAtMs = startedAtMs + durationMinutes * 60 * 1000;
+      const nowMs = Date.now();
+
+      if (nowMs >= expiresAtMs) {
+        // Expired: complete it automatically on the backend!
+        await this.completeSession(activeSession.id, durationMinutes * 60);
+      } else {
+        // Not expired: throw 400 Bad Request error
+        const error = new Error('An active interview session already exists. Please resume or abandon it before starting a new one.');
+        (error as any).statusCode = 400;
+        throw error;
+      }
     }
 
     // Look up the template by templateId
@@ -150,12 +179,55 @@ export const interviewSessionService = {
       throw error;
     }
 
-    return prisma.interviewSession.update({
+    const updatedSession = await prisma.interviewSession.update({
       where: { id: sessionId },
       data: {
         status: SessionStatus.COMPLETED,
         completedAt: new Date(),
         totalTime: totalTime !== undefined ? totalTime : undefined,
+      },
+      include: {
+        answers: true,
+        interviewTemplate: true,
+      },
+    });
+
+    // Create a pending evaluation record synchronously
+    await aiEvaluationService.createPendingEvaluation(sessionId);
+
+    // Fire off AI evaluation asynchronously in the background
+    aiEvaluationService.generateEvaluation(sessionId).catch((err) => {
+      console.error(`Async AI evaluation failed for session ${sessionId}:`, err);
+    });
+
+    return updatedSession;
+  },
+
+  /**
+   * Abandons an active interview session.
+   * Updates status to ABANDONED and sets completedAt.
+   */
+  async abandonSession(sessionId: string) {
+    const session = await prisma.interviewSession.findUnique({
+      where: { id: sessionId },
+    });
+    if (!session) {
+      const error = new Error(`Interview session with ID "${sessionId}" not found`);
+      (error as any).statusCode = 404;
+      throw error;
+    }
+
+    if (session.status === SessionStatus.COMPLETED) {
+      const error = new Error('Cannot abandon a completed session.');
+      (error as any).statusCode = 400;
+      throw error;
+    }
+
+    return prisma.interviewSession.update({
+      where: { id: sessionId },
+      data: {
+        status: SessionStatus.ABANDONED,
+        completedAt: new Date(),
       },
       include: {
         answers: true,

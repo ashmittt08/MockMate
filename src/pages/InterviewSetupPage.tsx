@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useInterview } from '../context/InterviewContext';
+import { useApp } from '../context/AppContext';
+import { interviewService } from '../services/interviewService';
 import { ROUTES } from '../constants/routes';
 import type { RoleId } from '../constants/roles';
 import type { DifficultyId } from '../constants/difficulty';
@@ -15,7 +17,8 @@ import {
 } from 'lucide-react';
 
 export const InterviewSetupPage: React.FC = () => {
-  const { startSession } = useInterview();
+  const { user } = useApp();
+  const { startSession, resumeSession } = useInterview();
   const navigate = useNavigate();
 
   // Selection states
@@ -23,9 +26,83 @@ export const InterviewSetupPage: React.FC = () => {
   const [difficulty, setDifficulty] = useState<DifficultyId>('Medium');
   const [type, setType] = useState<'Technical' | 'Behavioral'>('Technical');
 
-  const handleStart = () => {
-    startSession(role, difficulty, type);
-    navigate(ROUTES.INTERVIEW_SESSION);
+  // Active session check states
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [remainingTimeText, setRemainingTimeText] = useState('');
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [sessionStarting, setSessionStarting] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    const fetchActiveSession = async () => {
+      if (!user?.uid) return;
+      try {
+        const session = await interviewService.getActiveSession(user.uid);
+        if (active) {
+          setActiveSession(session);
+        }
+      } catch (err) {
+        console.error('Failed to fetch active session:', err);
+      }
+    };
+    fetchActiveSession();
+    return () => {
+      active = false;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const updateCountdown = () => {
+      const startedTime = new Date(activeSession.startedAt).getTime();
+      const durationMs = (activeSession.interviewTemplate?.duration || 30) * 60 * 1000;
+      const expirationTime = startedTime + durationMs;
+      const now = Date.now();
+      const remainingSeconds = Math.max(0, Math.floor((expirationTime - now) / 1000));
+
+      if (remainingSeconds <= 0) {
+        setActiveSession(null);
+        setRemainingTimeText('Expired');
+      } else {
+        const mins = Math.floor(remainingSeconds / 60);
+        const secs = remainingSeconds % 60;
+        setRemainingTimeText(`${mins}:${secs.toString().padStart(2, '0')}`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  const handleStart = async () => {
+    if (activeSession) {
+      setShowDuplicateModal(true);
+      return;
+    }
+    try {
+      setSessionStarting(true);
+      await startSession(role, difficulty, type);
+      navigate(ROUTES.INTERVIEW_SESSION);
+    } catch (err) {
+      console.error(err);
+      alert('Failed to start interview session. Please try again.');
+    } finally {
+      setSessionStarting(false);
+    }
+  };
+
+  const handleResume = async (sessionId: string) => {
+    try {
+      setSessionStarting(true);
+      await resumeSession(sessionId);
+      navigate(ROUTES.INTERVIEW_SESSION);
+    } catch (err) {
+      console.error('Failed to resume session:', err);
+      alert('Failed to resume session. Please try again.');
+    } finally {
+      setSessionStarting(false);
+    }
   };
 
   const roles: {
@@ -236,7 +313,8 @@ export const InterviewSetupPage: React.FC = () => {
 
             <button
               onClick={handleStart}
-              className="flex w-full items-center justify-center space-x-1.5 rounded-xl bg-app-primary py-3.5 text-sm font-semibold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10 cursor-pointer"
+              disabled={sessionStarting}
+              className="flex w-full items-center justify-center space-x-1.5 rounded-xl bg-app-primary py-3.5 text-sm font-semibold text-white hover:bg-app-primary/95 transition-all shadow-md shadow-app-primary/10 cursor-pointer disabled:opacity-50"
             >
               <span>Initialize Simulation</span>
               <ChevronRight className="h-4 w-4" />
@@ -244,6 +322,87 @@ export const InterviewSetupPage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-app-surface p-6 shadow-2xl space-y-6 text-left">
+            <div className="flex items-start space-x-4">
+              <div className="rounded-xl p-3 bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                <Video className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white">Active Session in Progress</h3>
+                <p className="text-xs text-app-muted leading-relaxed">
+                  You already have an active practice session for <strong className="text-slate-200">{activeSession?.interviewTemplate?.title || 'an interview'}</strong>. You cannot start a concurrent session.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white/5 p-4 space-y-2 text-xs">
+              <div className="flex justify-between text-app-muted">
+                <span>Started At</span>
+                <span className="font-semibold text-white">
+                  {activeSession && new Date(activeSession.startedAt).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-app-muted">
+                <span>Time Remaining</span>
+                <span className="font-semibold text-rose-400 font-mono">
+                  {remainingTimeText || 'Calculating...'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                }}
+                className="flex-1 rounded-xl border border-white/10 hover:border-white/20 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (activeSession) {
+                    if (window.confirm("Are you sure you want to abandon the current interview session? This will delete all current progress and cannot be undone.")) {
+                      try {
+                        setShowDuplicateModal(false);
+                        setSessionStarting(true);
+                        await interviewService.abandonSession(activeSession.id);
+                        setActiveSession(null);
+                        
+                        // Old session abandoned successfully, now start the new custom session!
+                        await startSession(role, difficulty, type);
+                        navigate(ROUTES.INTERVIEW_SESSION);
+                      } catch (err) {
+                        console.error('Failed to abandon session:', err);
+                        alert('Failed to abandon session. Please try again.');
+                      } finally {
+                        setSessionStarting(false);
+                      }
+                    }
+                  }
+                }}
+                className="flex-1 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/15 py-2.5 text-xs font-semibold transition-all cursor-pointer text-center"
+              >
+                Abandon & Start New
+              </button>
+              <button
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  if (activeSession) {
+                    handleResume(activeSession.id);
+                  }
+                }}
+                className="flex-1 rounded-xl bg-app-primary hover:bg-app-primary/95 text-white py-2.5 text-xs font-semibold transition-all shadow-md shadow-app-primary/10 cursor-pointer text-center"
+              >
+                Resume
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

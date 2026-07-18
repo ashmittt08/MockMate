@@ -5,6 +5,7 @@ import { useInterview } from '../context/InterviewContext';
 import { ROUTES } from '../constants/routes';
 import { backendService } from '../services/backendService';
 import { interviewTemplateService } from '../services/interviewTemplateService';
+import { interviewService } from '../services/interviewService';
 import type { InterviewTemplate } from '../types';
 import {
   Award,
@@ -20,7 +21,7 @@ import {
 
 export const DashboardPage: React.FC = () => {
   const { user, interviews } = useApp();
-  const { startSessionFromTemplate } = useInterview();
+  const { startSessionFromTemplate, resumeSession } = useInterview();
   const navigate = useNavigate();
   const [healthStatus, setHealthStatus] = useState<'loading' | 'connected' | 'offline'>('loading');
 
@@ -29,6 +30,84 @@ export const DashboardPage: React.FC = () => {
   const [templatesLoading, setTemplatesLoading] = useState(true);
   const [templatesError, setTemplatesError] = useState<string | null>(null);
   const [sessionStarting, setSessionStarting] = useState(false);
+
+  // Active session states
+  const [activeSession, setActiveSession] = useState<any | null>(null);
+  const [remainingTimeText, setRemainingTimeText] = useState('');
+  const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const fetchActiveSession = async () => {
+      if (!user?.uid) return;
+      try {
+        const session = await interviewService.getActiveSession(user.uid);
+        if (active) {
+          setActiveSession(session);
+        }
+      } catch (err) {
+        console.error('Failed to fetch active session:', err);
+      }
+    };
+    fetchActiveSession();
+    return () => {
+      active = false;
+    };
+  }, [user?.uid]);
+
+  useEffect(() => {
+    if (!activeSession) return;
+    const updateCountdown = () => {
+      const startedTime = new Date(activeSession.startedAt).getTime();
+      const durationMs = (activeSession.interviewTemplate?.duration || 30) * 60 * 1000;
+      const expirationTime = startedTime + durationMs;
+      const now = Date.now();
+      const remainingSeconds = Math.max(0, Math.floor((expirationTime - now) / 1000));
+
+      if (remainingSeconds <= 0) {
+        setActiveSession(null);
+        setRemainingTimeText('Expired');
+      } else {
+        const mins = Math.floor(remainingSeconds / 60);
+        const secs = remainingSeconds % 60;
+        setRemainingTimeText(`${mins}:${secs.toString().padStart(2, '0')}`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [activeSession]);
+
+  const handleAbandon = async (sessionId: string) => {
+    if (!window.confirm("Are you sure you want to abandon this interview session? Your progress will be lost and this action cannot be undone.")) {
+      return;
+    }
+    try {
+      setSessionStarting(true);
+      await interviewService.abandonSession(sessionId);
+      setActiveSession(null);
+    } catch (err) {
+      console.error('Failed to abandon session:', err);
+      alert('Failed to abandon session. Please try again.');
+    } finally {
+      setSessionStarting(false);
+    }
+  };
+
+  const handleResume = async (sessionId: string) => {
+    try {
+      setSessionStarting(true);
+      await resumeSession(sessionId);
+      navigate(ROUTES.INTERVIEW_SESSION);
+    } catch (err) {
+      console.error('Failed to resume session:', err);
+      alert('Failed to resume session. Please try again.');
+    } finally {
+      setSessionStarting(false);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -326,6 +405,53 @@ export const DashboardPage: React.FC = () => {
           <p className="text-xs text-app-muted mt-1">Select a structured practice track below to start a live mock interview session.</p>
         </div>
 
+        {activeSession && (
+          <div className="rounded-2xl border border-app-primary/30 bg-app-primary/5 p-6 relative overflow-hidden flex flex-col md:flex-row md:items-center justify-between gap-6 shadow-lg shadow-app-primary/5">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+              <Clock className="h-24 w-24 text-app-primary" />
+            </div>
+            
+            <div className="space-y-2">
+              <div className="flex items-center space-x-2.5">
+                <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+                  Active Session In Progress
+                </span>
+              </div>
+              <h4 className="text-xl font-extrabold text-white">
+                {activeSession.interviewTemplate?.title || 'Mock Interview'}
+              </h4>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-app-muted">
+                <span>
+                  Started: <strong className="text-slate-300 font-medium">{new Date(activeSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong>
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1">
+                  Time Remaining: <strong className="text-rose-400 font-bold font-mono">{remainingTimeText || 'Calculating...'}</strong>
+                </span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 shrink-0">
+              <button
+                onClick={() => handleAbandon(activeSession.id)}
+                disabled={sessionStarting}
+                className="rounded-xl border border-white/10 hover:border-white/20 hover:bg-white/5 px-4.5 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Abandon Session
+              </button>
+              <button
+                onClick={() => handleResume(activeSession.id)}
+                disabled={sessionStarting}
+                className="inline-flex items-center space-x-1.5 rounded-xl bg-app-primary hover:bg-app-primary/95 px-5 py-2.5 text-xs font-semibold text-white transition-all shadow-md shadow-app-primary/10 cursor-pointer"
+              >
+                <span>Resume Interview</span>
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        )}
+
         {templatesLoading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[1, 2, 3].map(n => (
@@ -342,6 +468,11 @@ export const DashboardPage: React.FC = () => {
               <button
                 key={template.id}
                 onClick={async () => {
+                  if (activeSession) {
+                    setPendingTemplateId(template.id);
+                    setShowDuplicateModal(true);
+                    return;
+                  }
                   try {
                     setSessionStarting(true);
                     await startSessionFromTemplate(template.id);
@@ -474,6 +605,91 @@ export const DashboardPage: React.FC = () => {
           )}
         </div>
       </div>
+
+      {showDuplicateModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="relative w-full max-w-md rounded-2xl border border-white/10 bg-app-surface p-6 shadow-2xl space-y-6 text-left">
+            <div className="flex items-start space-x-4">
+              <div className="rounded-xl p-3 bg-orange-500/10 text-orange-400 border border-orange-500/20">
+                <Video className="h-6 w-6" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-lg font-bold text-white">Active Session in Progress</h3>
+                <p className="text-xs text-app-muted leading-relaxed">
+                  You already have an active practice session for <strong className="text-slate-200">{activeSession?.interviewTemplate?.title || 'an interview'}</strong>. You cannot start a concurrent session.
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-xl bg-white/5 p-4 space-y-2 text-xs">
+              <div className="flex justify-between text-app-muted">
+                <span>Started At</span>
+                <span className="font-semibold text-white">
+                  {activeSession && new Date(activeSession.startedAt).toLocaleString()}
+                </span>
+              </div>
+              <div className="flex justify-between text-app-muted">
+                <span>Time Remaining</span>
+                <span className="font-semibold text-rose-400 font-mono">
+                  {remainingTimeText || 'Calculating...'}
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  setPendingTemplateId(null);
+                }}
+                className="flex-1 rounded-xl border border-white/10 hover:border-white/20 py-2.5 text-xs font-semibold text-slate-300 hover:text-white transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  if (activeSession) {
+                    if (window.confirm("Are you sure you want to abandon the current interview session? This will delete all current progress and cannot be undone.")) {
+                      try {
+                        setShowDuplicateModal(false);
+                        setSessionStarting(true);
+                        await interviewService.abandonSession(activeSession.id);
+                        setActiveSession(null);
+                        
+                        if (pendingTemplateId) {
+                          await startSessionFromTemplate(pendingTemplateId);
+                          navigate(ROUTES.INTERVIEW_SESSION);
+                        }
+                      } catch (err) {
+                        console.error('Failed to abandon session:', err);
+                        alert('Failed to abandon session. Please try again.');
+                      } finally {
+                        setSessionStarting(false);
+                        setPendingTemplateId(null);
+                      }
+                    }
+                  }
+                }}
+                className="flex-1 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 hover:bg-orange-500/15 py-2.5 text-xs font-semibold transition-all cursor-pointer text-center"
+              >
+                Abandon & Start New
+              </button>
+              <button
+                onClick={() => {
+                  setShowDuplicateModal(false);
+                  setPendingTemplateId(null);
+                  if (activeSession) {
+                    handleResume(activeSession.id);
+                  }
+                }}
+                className="flex-1 rounded-xl bg-app-primary hover:bg-app-primary/95 text-white py-2.5 text-xs font-semibold transition-all shadow-md shadow-app-primary/10 cursor-pointer text-center"
+              >
+                Resume
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

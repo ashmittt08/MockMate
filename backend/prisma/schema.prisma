@@ -57,19 +57,46 @@ enum AnswerStatus {
   SKIPPED
 }
 
+enum EvaluationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
 model InterviewSession {
-  id                  String            @id @default(cuid())
+  id                  String               @id @default(cuid())
   userId              String
-  user                User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   interviewTemplateId String
-  interviewTemplate   InterviewTemplate @relation(fields: [interviewTemplateId], references: [id], onDelete: Cascade)
-  status              SessionStatus     @default(ACTIVE)
-  startedAt           DateTime          @default(now())
+  interviewTemplate   InterviewTemplate    @relation(fields: [interviewTemplateId], references: [id], onDelete: Cascade)
+  status              SessionStatus        @default(ACTIVE)
+  startedAt           DateTime             @default(now())
   completedAt         DateTime?
-  totalTime           Int               @default(0)
+  totalTime           Int                  @default(0)
   answers             InterviewAnswer[]
-  createdAt           DateTime          @default(now())
-  updatedAt           DateTime          @updatedAt
+  evaluation          InterviewEvaluation?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+}
+
+model InterviewEvaluation {
+  id                 String           @id @default(cuid())
+  interviewSessionId String           @unique
+  interviewSession   InterviewSession @relation(fields: [interviewSessionId], references: [id], onDelete: Cascade)
+  status             EvaluationStatus @default(PENDING)
+  overallScore       Int              @default(0)
+  accuracyScore      Int              @default(0)
+  communicationScore Int              @default(0)
+  completenessScore  Int              @default(0)
+  strengths          String[]
+  weaknesses         String[]
+  suggestions        Json?
+  provider           String           @default("mock")
+  promptVersion      String           @default("v1")
+  rawResponse        String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 }
 
 model InterviewAnswer {

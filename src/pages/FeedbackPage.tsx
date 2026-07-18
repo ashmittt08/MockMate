@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
 import {
@@ -13,14 +13,131 @@ import {
 } from 'lucide-react';
 import { ROUTES } from '../constants/routes';
 import type { FeedbackSuggestion } from '../types';
+import { interviewService } from '../services/interviewService';
 
 export const FeedbackPage: React.FC = () => {
   const { reportId } = useParams<{ reportId: string }>();
   const { getReportById } = useApp();
   const navigate = useNavigate();
   
-  const report = getReportById(reportId || '');
+  const [evaluation, setEvaluation] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [localReport, setLocalReport] = useState<any | null>(null);
   const [expandedQuestion, setExpandedQuestion] = useState<number | null>(0);
+
+  useEffect(() => {
+    if (!reportId) return;
+
+    let active = true;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const fetchEvaluation = async () => {
+      try {
+        const data = await interviewService.getBackendEvaluation(reportId);
+        if (!active) return;
+
+        if (data) {
+          setEvaluation(data);
+          setError(null);
+
+          if (data.status === 'COMPLETED' || data.status === 'FAILED') {
+            setLoading(false);
+            if (intervalId) {
+              clearInterval(intervalId);
+              intervalId = null;
+            }
+          }
+        }
+      } catch (err: any) {
+        if (!active) return;
+        
+        // If 404 or other network failure, fallback to local reports (backward compatibility)
+        if (err.response?.status === 404 || err.message?.includes('404')) {
+          const local = getReportById(reportId);
+          if (local) {
+            setLocalReport(local);
+            setLoading(false);
+            if (intervalId) clearInterval(intervalId);
+            return;
+          }
+        }
+        
+        console.error('Failed to load evaluation:', err);
+        setError('Failed to retrieve evaluation results.');
+        setLoading(false);
+        if (intervalId) clearInterval(intervalId);
+      }
+    };
+
+    fetchEvaluation();
+
+    // Poll every 3 seconds for async background evaluation completion
+    intervalId = setInterval(fetchEvaluation, 3000);
+
+    return () => {
+      active = false;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [reportId, getReportById]);
+
+  // Map backend report if loaded, or use local fallback
+  const report = localReport || (evaluation && evaluation.status === 'COMPLETED' ? {
+    id: evaluation.id,
+    role: evaluation.interviewSession?.interviewTemplate?.role || 'Frontend',
+    difficulty: evaluation.interviewSession?.interviewTemplate?.difficulty || 'Medium',
+    type: evaluation.interviewSession?.interviewTemplate?.title?.toLowerCase().includes('hr') || evaluation.suggestions?.some((s: any) => s.questionText?.toLowerCase().includes('behavioral')) ? 'Behavioral' : 'Technical',
+    date: new Date(evaluation.interviewSession?.startedAt || Date.now()).toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' }),
+    overallScore: evaluation.overallScore,
+    accuracyScore: evaluation.accuracyScore,
+    communicationScore: evaluation.communicationScore,
+    completenessScore: evaluation.completenessScore,
+    strengths: evaluation.strengths,
+    weaknesses: evaluation.weaknesses,
+    suggestions: evaluation.suggestions || []
+  } : null);
+
+  if (loading || (evaluation && (evaluation.status === 'PENDING' || evaluation.status === 'PROCESSING'))) {
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center text-center space-y-6 max-w-md mx-auto animate-pulse">
+        <div className="relative flex items-center justify-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-app-primary"></div>
+          <Sparkles className="absolute h-6 w-6 text-app-accent animate-bounce" />
+        </div>
+        <div className="space-y-2">
+          <h2 className="text-xl font-bold text-white">Analyzing Session Feedback</h2>
+          <p className="text-sm text-app-muted leading-relaxed">
+            Our AI Evaluation Engine is processing your answers, checking keyword alignments, and compiling score suggestions. This takes about 5-10 seconds.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || (evaluation && evaluation.status === 'FAILED')) {
+    return (
+      <div className="text-center py-20 space-y-4 max-w-md mx-auto">
+        <h2 className="text-2xl font-bold text-white">Evaluation Failed</h2>
+        <p className="text-app-muted">
+          We encountered an issue while generating your AI evaluation report. Please try practicing again or return to the dashboard.
+        </p>
+        <div className="flex gap-4 justify-center">
+          <Link
+            to={ROUTES.DASHBOARD}
+            className="inline-flex items-center space-x-1.5 rounded-xl border border-white/10 bg-white/5 px-4.5 py-2.5 text-xs font-semibold text-slate-300"
+          >
+            <span>Dashboard</span>
+          </Link>
+          <Link
+            to={ROUTES.INTERVIEW_SETUP}
+            className="inline-flex items-center space-x-1.5 rounded-xl bg-app-primary px-4.5 py-2.5 text-xs font-semibold text-white"
+          >
+            <span>Practice Again</span>
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   if (!report) {
     return (

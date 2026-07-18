@@ -1,7 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import type { InterviewSession, Answer } from '../types';
 import { interviewService } from '../services/interviewService';
-import { feedbackService } from '../services/feedbackService';
 import { useApp } from './AppContext';
 import { interviewTemplateService } from '../services/interviewTemplateService';
 
@@ -33,12 +32,13 @@ interface InterviewContextType {
   autoSubmittedReportId: string | null;
   clearAutoSubmittedReportId: () => void;
   autoCompleteSession: () => Promise<string>;
+  resumeSession: (sessionId: string) => Promise<void>;
 }
 
 const InterviewContext = createContext<InterviewContextType | undefined>(undefined);
 
 export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { addFeedbackReport, user } = useApp();
+  const { user } = useApp();
 
   const [currentSession, setCurrentSession] = useState<InterviewSession | null>(() => {
     const stored = localStorage.getItem('mockmate_current_session');
@@ -382,6 +382,122 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }
     } catch (err) {
       console.warn("Failed to sync session with backend on mount. Using offline cache.", err);
+    }
+  };
+
+  const resumeSession = async (sessionId: string): Promise<void> => {
+    setIsLoading(true);
+    setApiError(null);
+    try {
+      const backendSession = await interviewService.getBackendSession(sessionId);
+      if (!backendSession) {
+        throw new Error('Session not found on backend');
+      }
+
+      // Restores all answers, progress, timer
+      const duration = backendSession.interviewTemplate?.duration || 30;
+      const startedTime = new Date(backendSession.startedAt).getTime();
+      const expirationTime = startedTime + duration * 60 * 1000;
+      const isExpired = Date.now() >= expirationTime;
+
+      const updatedAnswers: Record<string, Answer> = {};
+      
+      const questions = backendSession.interviewTemplate?.questions?.map((q: any) => ({
+        id: q.id,
+        text: q.question,
+        type: q.type,
+        category: q.type,
+        tips: [
+          "Focus on key concepts and define important terminology.",
+          "Provide a real-world scenario or project where you implemented this approach.",
+          "Discuss any trade-offs, advantages, or limitations associated with this choice."
+        ],
+        order: q.order,
+        modelAnswer: q.expectedAnswer
+      })).sort((a: any, b: any) => a.order - b.order) || [];
+
+      backendSession.answers.forEach((ans: any) => {
+        const q = questions.find((quest: any) => quest.id === ans.questionId);
+        updatedAnswers[ans.questionId] = {
+          questionId: ans.questionId,
+          questionText: q ? q.text : '',
+          userAnswer: ans.userAnswer,
+          timeSpentSeconds: ans.timeSpentSeconds,
+          hintUsed: ans.hintUsed,
+          visited: ans.visited,
+          lastEdited: ans.lastEditedAt || ans.updatedAt
+        };
+      });
+
+      // Restore progress: resume the last viewed question instead of the first unanswered question whenever possible.
+      let restoredActiveIndex = 0;
+      if (backendSession.answers && backendSession.answers.length > 0) {
+        const sortedAnswers = [...backendSession.answers].sort((a: any, b: any) => {
+          const timeA = new Date(a.lastEditedAt || a.updatedAt || 0).getTime();
+          const timeB = new Date(b.lastEditedAt || b.updatedAt || 0).getTime();
+          return timeB - timeA;
+        });
+        const lastActiveQuestionId = sortedAnswers[0]?.questionId;
+        if (lastActiveQuestionId) {
+          const foundIndex = questions.findIndex((q: any) => q.id === lastActiveQuestionId);
+          if (foundIndex !== -1) {
+            restoredActiveIndex = foundIndex;
+          }
+        }
+      }
+
+      // Ensure active question is marked as visited in restored state
+      const activeQuestion = questions[restoredActiveIndex];
+      if (activeQuestion) {
+        const activeAns = updatedAnswers[activeQuestion.id];
+        updatedAnswers[activeQuestion.id] = {
+          ...(activeAns || {
+            questionId: activeQuestion.id,
+            questionText: activeQuestion.text,
+            userAnswer: '',
+            timeSpentSeconds: 0,
+            hintUsed: false,
+            lastEdited: new Date().toISOString()
+          }),
+          visited: true
+        };
+      }
+
+      const session: InterviewSession = {
+        id: sessionId,
+        templateId: backendSession.interviewTemplateId,
+        role: backendSession.interviewTemplate?.role || 'Frontend',
+        difficulty: backendSession.interviewTemplate?.difficulty || 'Medium',
+        type: (backendSession.interviewTemplate?.title?.toLowerCase().includes('hr') || backendSession.answers.some((ans: any) => ans.question?.type?.toLowerCase().includes('behavioral'))) ? 'Behavioral' : 'Technical',
+        questions: questions,
+        answers: updatedAnswers,
+        activeQuestionIndex: restoredActiveIndex,
+        timerSeconds: backendSession.totalTime || 0,
+        isCompleted: false,
+        startedAt: backendSession.startedAt,
+        duration: duration
+      };
+
+      setCurrentSession(session);
+      setActiveQuestionIndex(restoredActiveIndex);
+      
+      if (activeQuestion) {
+        const savedAnswer = updatedAnswers[activeQuestion.id];
+        setCurrentQuestionTimeSpent(savedAnswer?.timeSpentSeconds || 0);
+      }
+
+      setSyncStatus('saved');
+
+      if (isExpired) {
+        console.log("Resumed ACTIVE session is already expired. Auto-submitting...");
+        await autoCompleteSessionWithObject(session);
+      }
+    } catch (err) {
+      console.error("Failed to resume session:", err);
+      setApiError("Failed to resume active session. Please check your internet connection.");
+      throw err;
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -738,14 +854,12 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await interviewService.completeBackendSession(finalSession.id, finalSession.timerSeconds);
       }
 
-      const report = await feedbackService.generateFeedbackReport(finalSession);
-      addFeedbackReport(report, finalSession);
-
       // Local state is cleared only AFTER successful server completion
+      const sessionId = finalSession.id || '';
       setCurrentSession(null);
       localStorage.removeItem('mockmate_current_session');
       setSyncStatus('idle');
-      return report.id;
+      return sessionId;
     } catch (error) {
       console.error('Failed to complete session on server:', error);
       setSyncStatus('error');
@@ -806,16 +920,13 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         await interviewService.completeBackendSession(sessionToSubmit.id, sessionToSubmit.timerSeconds);
       }
 
-      // Generate report and complete locally
-      const report = await feedbackService.generateFeedbackReport(sessionToSubmit);
-      addFeedbackReport(report, sessionToSubmit);
-
       // Local state is cleared only AFTER successful server completion
+      const sessionId = sessionToSubmit.id || '';
       setCurrentSession(null);
       localStorage.removeItem('mockmate_current_session');
       setSyncStatus('idle');
-      setAutoSubmittedReportId(report.id);
-      return report.id;
+      setAutoSubmittedReportId(sessionId);
+      return sessionId;
     } catch (error) {
       console.error('Failed to auto-complete session:', error);
       setSyncStatus('error');
@@ -883,7 +994,8 @@ export const InterviewProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         timerStatus,
         autoSubmittedReportId,
         clearAutoSubmittedReportId,
-        autoCompleteSession
+        autoCompleteSession,
+        resumeSession
       }}
     >
       {children}

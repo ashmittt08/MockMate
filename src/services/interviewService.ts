@@ -141,5 +141,27 @@ export const interviewService = {
       `/api/interview-sessions/${sessionId}`
     );
     return response.data.data;
+  },
+
+  async getActiveSession(firebaseUid: string): Promise<any> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      '/api/interview-sessions/active',
+      { params: { firebaseUid } }
+    );
+    return response.data.data;
+  },
+
+  async abandonSession(sessionId: string): Promise<any> {
+    const response = await apiClient.patch<{ success: boolean; data: any }>(
+      `/api/interview-sessions/${sessionId}/abandon`
+    );
+    return response.data;
+  },
+
+  async getBackendEvaluation(sessionId: string): Promise<any> {
+    const response = await apiClient.get<{ success: boolean; data: any }>(
+      `/api/interview-sessions/${sessionId}/evaluation`
+    );
+    return response.data.data;
   }
 };
